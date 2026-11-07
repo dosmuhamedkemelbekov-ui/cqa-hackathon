@@ -77,7 +77,9 @@ python scripts/accuracy.py --sure      # только бесспорные от�
 
 ## Модель и стоимость
 
-Модель задаётся в `.env` (`CQA_MODEL`). Подходит любая модель с OpenAI-совместимым API:
+Модель задаётся в `.env`. Два провайдера на выбор:
+- **Claude (Anthropic)** — `CQA_PROVIDER=anthropic`, `ANTHROPIC_API_KEY`, модель `CQA_CLAUDE_MODEL` (по умолчанию `claude-opus-5-5`), глубина рассуждения `CQA_CLAUDE_EFFORT`. Официальный SDK Anthropic, структурированный вывод по JSON Schema, кэширование транскрипта (`cache_control`), серверный fallback при отказе классификаторов безопасности. Стоимость оценки считается по ценам модели автоматически.
+- **OpenAI-совместимый API** — `CQA_MODEL`. Подходит любая модель с OpenAI-совместимым API:
 - **облако:** OpenAI (по умолчанию `gpt-5.6-luna`; reasoning-модели без temperature поддерживаются автоматически);
 - **локально:** Ollama, LM Studio или vLLM — достаточно задать `OPENAI_BASE_URL=http://localhost:11434/v1`.
 
