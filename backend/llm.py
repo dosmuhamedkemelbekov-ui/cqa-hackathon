@@ -11,6 +11,8 @@ from . import config
 
 _client: AsyncOpenAI | None = None
 _sem: asyncio.Semaphore | None = None
+# Порядок, в котором снимаем параметры при «немой» ошибке 400.
+_OPTIONAL_ORDER = ("prompt_cache_breakpoint", "prompt_cache_key", "seed", "json_schema", "temperature")
 # Некоторые модели (reasoning) не принимают temperature/seed или json_schema — запоминаем и больше не шлём.
 _unsupported: set[str] = set()
 
@@ -92,6 +94,8 @@ async def _complete_openai(system: str, user: str, schema: dict, name: str, mode
     last_err: Exception | None = None
     rate_waits = 0
     attempt = 0
+    if config.LLM_BASE_URL and "api.openai.com" not in config.LLM_BASE_URL:
+        _unsupported.update({"prompt_cache_breakpoint", "prompt_cache_key"})
     while attempt < 4:
         attempt += 1
         kwargs: dict = {
@@ -132,7 +136,7 @@ async def _complete_openai(system: str, user: str, schema: dict, name: str, mode
             # Параметр, который модель не принимает, запоминаем и повторяем без него.
             # Проверяем по тому, что было отправлено в ЭТОМ запросе: параллельные вызовы
             # могли уже пометить параметр, но им тоже нужен повтор.
-            msg = str(e).lower()
+            msg = (str(e) + " " + json.dumps(getattr(e, "body", None), ensure_ascii=False, default=str)).lower()
             sent = {p for p in ("temperature", "seed", "prompt_cache_key") if p in kwargs}
             if isinstance(kwargs["messages"][1]["content"], list):
                 sent.add("prompt_cache_breakpoint")
@@ -142,10 +146,15 @@ async def _complete_openai(system: str, user: str, schema: dict, name: str, mode
                    if p in msg and p in sent}
             if "json_schema" in sent and ("json_schema" in msg or "response_format" in msg):
                 hit.add("json_schema")
+            if not hit:
+                # Некоторые провайдеры (Gemini, Groq) не называют параметр в ошибке 400:
+                # снимаем необязательные параметры по одному, от самого специфичного для OpenAI.
+                hit = {next((p for p in _OPTIONAL_ORDER if p in sent), "")} - {""}
             last_err = e
             if not hit:
-                raise
+                raise RuntimeError(f"Провайдер отклонил запрос (400): {msg[:400]}") from e
             _unsupported.update(hit)
+            attempt -= 1  # снятие параметра не тратит попытку
         except RateLimitError as e:
             msg = str(e).lower()
             # Закончились кредиты (OpenAI) — повторять бессмысленно, сразу понятная ошибка.
