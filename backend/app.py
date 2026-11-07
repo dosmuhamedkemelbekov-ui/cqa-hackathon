@@ -28,6 +28,8 @@ def health():
         "model": config.LLM_MODEL,
         "base_url": config.LLM_BASE_URL or "https://api.openai.com/v1",
         "samples": config.LLM_SAMPLES,
+        "verify": config.LLM_VERIFY,
+        "precedents": len(db.get_setting("precedents", [])),
     }
 
 
@@ -228,7 +230,9 @@ async def evaluate_one(conv_id: str, checklist_id: str | None = None, samples: i
         raise HTTPException(404, "Диалог не найден")
     # fresh=True: ИИ заново отвечает по всем критериям; вердикты супервизора по неизменённым критериям сохраняются.
     previous = db.latest_evaluation(conv_id)
-    ev = await evaluator.evaluate(conv, _checklist_for(checklist_id), samples, previous, reuse_answers=not fresh)
+    ev = await evaluator.evaluate(conv, _checklist_for(checklist_id), samples, previous, reuse_answers=not fresh,
+                                  precedents=db.get_setting("precedents", []))
+    ev["reliability"] = evaluator.reliability(ev)
     return db.save_evaluation(ev)
 
 
@@ -239,7 +243,8 @@ async def _run_job(job_id: str, conv_ids: list[str], cl: dict, samples: int | No
         try:
             conv = db.get_conversation(cid)
             previous = db.latest_evaluation(cid) if reuse else None
-            ev = await evaluator.evaluate(conv, cl, samples, previous)
+            ev = await evaluator.evaluate(conv, cl, samples, previous, precedents=db.get_setting("precedents", []))
+            ev["reliability"] = evaluator.reliability(ev)
             db.save_evaluation(ev)
             job["cost_usd"] += ev["cost_usd"]
             job["llm_calls"] += ev["llm_calls"]
@@ -375,12 +380,54 @@ def _apply_review(ev: dict, criterion_id: str, new_answer: str, reason: str, rev
          "total_before": before, "total_after": ev["final_score"]["total"]}
     )
     db.update_evaluation(ev)
+    if new_answer != current:
+        _add_precedent(ev, criterion_id, new_answer, reason)
     for a in db.list_appeals(status="open", conversation_id=ev["conversation_id"]):
         if a["criterion_id"] == criterion_id and (appeal_id is None or a["id"] == appeal_id):
             data = {**a["data"], "decision": "change" if new_answer != current else "confirm", "new_answer": new_answer,
                     "reason": reason.strip(), "reviewer": reviewer, "total_after": ev["final_score"]["total"]}
             db.resolve_appeal(a["id"], "confirmed" if new_answer == current else "changed", data)
     return ev
+
+
+def _add_precedent(ev: dict, criterion_id: str, decided: str, reason: str) -> None:
+    """Решение супервизора становится прецедентом: ИИ учитывает его в следующих оценках других диалогов."""
+    item = next((i for i in ev["criteria"] if i["criterion_id"] == criterion_id), {})
+    quote = "; ".join(e.get("quote", "") for e in (item.get("evidence") or [])[:2])
+    precs = [p for p in db.get_setting("precedents", [])
+             if not (p["conversation_id"] == ev["conversation_id"] and p["criterion_id"] == criterion_id)]
+    precs.append({"id": uuid.uuid4().hex[:8], "criterion_id": criterion_id, "criterion_name": item.get("name", criterion_id),
+                  "conversation_id": ev["conversation_id"], "ai_answer": ev["original_answers"].get(criterion_id),
+                  "decided": decided, "reason": reason.strip(), "quote": quote, "at": db.now()})
+    db.set_setting("precedents", precs[-200:])
+
+
+@app.get("/api/precedents")
+def precedents():
+    return list(reversed(db.get_setting("precedents", [])))
+
+
+@app.delete("/api/precedents/{pid}")
+def delete_precedent(pid: str):
+    precs = db.get_setting("precedents", [])
+    db.set_setting("precedents", [p for p in precs if p["id"] != pid])
+    return {"deleted": pid}
+
+
+@app.post("/api/evaluations/{ev_id}/coaching")
+async def coaching(ev_id: int):
+    ev = db.get_evaluation(ev_id)
+    if not ev:
+        raise HTTPException(404, "Оценка не найдена")
+    conv = db.get_conversation(ev["conversation_id"])
+    try:
+        data, usage = await evaluator.coach(conv, ev)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(502, f"Не удалось получить рекомендации: {e}")
+    ev["coaching"] = {**data, "at": db.now(), "cost_usd": round(llm.cost_usd(usage), 5),
+                      "for_total": ev["final_score"]["total"]}
+    db.update_evaluation(ev)
+    return ev["coaching"]
 
 
 class ReviewReq(BaseModel):

@@ -38,6 +38,11 @@ LLM_MODEL = os.getenv("CQA_MODEL", "gpt-4.1")
 LLM_CONCURRENCY = int(os.getenv("CQA_CONCURRENCY", "8"))
 # Сколько независимых прогонов на критерий (голосование большинством / медиана). 1 — быстрее и дешевле.
 LLM_SAMPLES = int(os.getenv("CQA_SAMPLES", "1"))
+# Самопроверка: рискованные ответы (Нет, N/A, неполный балл, грубая ошибка, низкая уверенность)
+# перепроверяет независимый «контролёр» и исправляет ошибку. 0 — выключить.
+LLM_VERIFY = os.getenv("CQA_VERIFY", "1") not in ("0", "false", "no")
+# Сколько последних прецедентов (решений супервизора) по критерию подмешивать в промпт.
+PRECEDENTS_PER_CRITERION = int(os.getenv("CQA_PRECEDENTS", "6"))
 # Цена за 1M токенов (USD) — для расчёта стоимости одной оценки. Задайте под свою модель.
 PRICE_INPUT_PER_M = float(os.getenv("CQA_PRICE_INPUT_PER_M", "2.0"))
 PRICE_CACHED_INPUT_PER_M = float(os.getenv("CQA_PRICE_CACHED_INPUT_PER_M", "0.5"))

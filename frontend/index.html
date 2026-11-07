@@ -301,6 +301,65 @@ details.reason p{white-space:pre-wrap;font-size:12px;color:var(--n80);margin:6px
 .stat .v{font-size:22px;font-weight:700;margin-top:2px}
 .stat .s{font-size:11px;color:var(--n80)}
 .view.active.scroll{overflow:auto}
+/* компактные фильтры */
+.filters{padding:10px 12px}
+.fsearch{display:flex;align-items:center;gap:6px;border:1px solid var(--n60);border-radius:3px;background:#fff;padding:0 8px;height:32px;color:var(--n80)}
+.fsearch:focus-within{outline:2px solid var(--g600);outline-offset:-1px}
+.fsearch input{border:0;outline:0;flex:1;min-width:0;height:30px;background:transparent}
+.fsearch kbd{font:11px Consolas,monospace;border:1px solid var(--n40);border-radius:3px;padding:0 5px;color:var(--n80);background:var(--n10)}
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.fsel{display:flex;flex-direction:column;gap:2px;font-size:10px;font-weight:700;color:var(--n80);text-transform:uppercase;letter-spacing:.4px}
+.fsel select{height:28px;border:1px solid var(--n60);border-radius:3px;background:#fff;font-size:12px;font-weight:400;text-transform:none;letter-spacing:0;color:var(--n100);padding:0 4px}
+.fsort{margin-top:6px}
+#fReset{margin-top:6px;font-size:12px}
+.li{padding:9px 12px}
+.li-badges{margin-top:5px}
+/* транскрипт */
+.t-tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 16px;background:#fff;border-bottom:1px solid var(--n40);flex:none;font-size:12px;color:var(--n80)}
+.tsearch{display:flex;align-items:center;gap:6px;flex:1;min-width:160px}
+.tsearch input{flex:1;height:28px;border:1px solid var(--n60);border-radius:3px;padding:0 8px;background:#fff;min-width:0}
+.tgl{display:flex;align-items:center;gap:4px;cursor:pointer;white-space:nowrap}
+.t-legend{white-space:nowrap}
+.t-scroll.nobot .msg.bot{display:none}
+.msg.bot .m-text{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer}
+.msg.bot.full .m-text{display:block}
+.msg.match .bubble{background:#fff8d6;border-color:#f2c94c}
+.m-right{display:inline-flex;align-items:center;gap:3px}
+.emark{border:0;border-radius:8px;font-size:10px;font-weight:700;padding:1px 5px;line-height:14px;cursor:pointer}
+.emark.ok{background:var(--ok-bg);color:var(--ok)}.emark.err{background:var(--err-bg);color:var(--err)}
+.emark.warn,.emark.na{background:var(--warn-bg);color:var(--warn)}.emark.gray{background:var(--n30);color:var(--n80)}
+.emark:hover{filter:brightness(.92)}
+.msg.has-ev .bubble{border-left:3px solid var(--g500)}
+/* карточка */
+.rprev{display:block;font-weight:400;font-size:12px;color:var(--n80);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.cname{overflow:hidden}
+.acc.open .rprev{display:none}
+@keyframes flashc{0%{box-shadow:0 0 0 3px rgba(26,154,99,.6)}100%{box-shadow:0 0 0 0 rgba(26,154,99,0)}}
+.acc.flashc{animation:flashc 1.6s ease-out}
+.role-hint{padding:6px 10px}
+.rprev{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.vq{font-weight:700;font-size:11px}.vq.ok{color:var(--ok)}.vq.bad{color:var(--err)}
+.ev.unverified{background:var(--err-bg);border-color:#f1b8bc}
+.box.selfcheck{background:var(--g50);border-color:#b7dbc8}
+.box.selfcheck.changed{background:var(--info-bg);border-color:#b6d4ee}
+.sc-ok{font-size:10px;padding:2px 5px}
+.rel{margin:10px 16px 0;border:1px solid var(--n40);border-left:4px solid var(--g600);border-radius:3px;padding:8px 10px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;background:#fff}
+.rel.warn{border-left-color:#d29200}.rel.err{border-left-color:#c4314b}
+.rel-t{grid-column:1/-1;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--n80)}
+.rel-i{display:flex;flex-direction:column;font-size:11px;color:var(--n80);line-height:1.25}
+.rel-i b{font-size:16px;color:var(--n100)}
+.coach{margin:10px 16px 0;border:1px solid #b6d4ee;background:linear-gradient(180deg,#f3f8fd,#fff);border-radius:3px;padding:10px 12px;font-size:13px}
+.coach.empty-coach{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.coach-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.coach-sum{margin-bottom:6px}
+.coach-k{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--n80);margin:8px 0 3px}
+.coach-ul{margin:0;padding-left:18px}
+.tip{border-top:1px dashed var(--n40);padding:6px 0}
+.tip-h{display:flex;gap:6px;align-items:center;margin-bottom:3px}
+.tip .ev{margin:0}
+.better{margin-top:4px;padding:5px 8px;background:var(--ok-bg);color:var(--ok);border-radius:3px;font-weight:600}
+.small-muted{font-size:12px;color:var(--n80)}
+@media (max-width:1380px){.rel{grid-template-columns:1fr 1fr}}
 table.t .typecell select{width:130px}
 table.t .typecell input.in-scale{width:130px}
 table.t td:nth-child(2){min-width:280px}
@@ -374,6 +433,11 @@ table.t td:nth-child(2){min-width:280px}
         Перераспределение при N/A: <b>w′ᵢ = wᵢ / Σw<sub>активных</sub> × 100</b>. Критерий-флаг «Грубые ошибки» не имеет веса и не участвует в сумме.
         Для шкальных критериев доля = ступень / максимум шкалы (например, критерий 06: (ступень / 10) × 15). Итог округляется до двух знаков.
       </div>
+    </div>
+    <div class="card">
+      <header><h2>Обучение на апелляциях · прецедентов: <span id="precCount">0</span></h2>
+        <p>Каждое изменение оценки супервизором становится прецедентом: при следующих оценках ИИ получает его как пример трактовки правила по этому критерию. В оценку того же диалога прецедент не подмешивается — без утечки ответа.</p></header>
+      <div class="tbl-wrap"><table class="t" style="min-width:640px"><thead><tr><th>Критерий</th><th>Диалог</th><th>ИИ → решение</th><th>Причина</th><th></th></tr></thead><tbody id="precBody"></tbody></table></div>
     </div>
     <div class="card" id="reportCard" style="display:none">
       <header><h2>Результат переоценки</h2><p id="reportNote"></p></header>
@@ -459,7 +523,7 @@ function busy(btn,on,label){
 ===================================================================== */
 const state={
   role:'operator',view:'dialogs',
-  filters:{dataset:'all',channel:'all',lang:'all',status:'all'},
+  filters:{dataset:'all',channel:'all',lang:'all',status:'all',q:'',sort:'default'},hideBot:false,tq:'',
   selectedId:null,open:new Set(),
   checklist:null,     // активный чек-лист с сервера
   draft:null,         // черновик настроек
@@ -530,11 +594,24 @@ const statusBadge=s=>s==='Оценено'?'<span class="b ok">Оценено</sp
 /* =====================================================================
    ЗАГРУЗКА ДАННЫХ
 ===================================================================== */
+async function loadPrecedents(){
+  try{state.precedents=await api('/precedents');}catch(e){state.precedents=[];}
+  if(state.view==='settings')renderPrecedents();
+}
+function renderPrecedents(){
+  const el=$('#precBody');if(!el)return;
+  const ps=state.precedents||[];
+  $('#precCount').textContent=ps.length;
+  el.innerHTML=ps.length?ps.map(p=>{
+    const c=(state.checklist.criteria||[]).find(x=>x.id===p.criterion_id)||{type:'binary',scale:[]};
+    return '<tr><td><b>'+esc(p.criterion_name)+'</b></td><td>'+esc(p.conversation_id)+'</td><td>'+esc(plainVal(c,uiVal(c,p.ai_answer)))+' → <b>'+esc(plainVal(c,uiVal(c,p.decided)))+'</b></td><td style="font-size:12px">'+esc(p.reason)+'</td><td><button class="btn sm danger prec-del" data-id="'+esc(p.id)+'">Убрать</button></td></tr>';
+  }).join(''):'<tr><td colspan="5" class="empty">Пока нет. Когда супервизор меняет оценку ИИ, решение появляется здесь и учитывается в следующих оценках других диалогов.</td></tr>';
+}
 async function loadHealth(){
   try{
     state.health=await api('/health');
     $('#tabsNote').innerHTML=state.health.llm_configured
-      ?'Оценка ИИ на сервере · модель <b>'+esc(state.health.model)+'</b>'+(state.health.samples>1?' · '+state.health.samples+' прогона на критерий':'')
+      ?'Оценка ИИ на сервере · модель <b>'+esc(state.health.model)+'</b>'+(state.health.samples>1?' · '+state.health.samples+' прогона на критерий':'')+(state.health.verify?' · самопроверка вкл.':'')
       :'<span style="color:var(--err)">LLM не настроена: задайте OPENAI_API_KEY в .env</span>';
   }catch(e){$('#tabsNote').innerHTML='<span style="color:var(--err)">Сервер оценки недоступен</span>';}
 }
@@ -567,15 +644,37 @@ function filterDefs(){
     {key:'status',label:'Статус',opts:[['all','Все'],['Не оценено','Не оценено'],['Оценено','Оценено'],['Апелляция','Апелляция'],['Пересмотрено','Пересмотрено']]}
   ];
 }
+const SORTS=[['default','Порядок загрузки'],['attention','Сначала требующие внимания'],['score_asc','Балл: сначала низкие'],['score_desc','Балл: сначала высокие'],['id','По ID']];
+function countBy(key,val){
+  return state.list.filter(d=>key==='dataset'?d.dataset===val:key==='channel'?chan(d.channel)===val:key==='lang'?d.language===val:d.status===val).length;
+}
 function renderFilters(){
-  $('#filters').innerHTML=filterDefs().map(f=>
-    '<div class="fgroup"><div class="flabel">'+f.label+'</div><div class="chips">'+
-    f.opts.map(o=>'<button class="chip'+(state.filters[f.key]===o[0]?' on':'')+'" data-f="'+f.key+'" data-v="'+esc(o[0])+'">'+esc(o[1])+'</button>').join('')+
-    '</div></div>').join('');
+  const f=state.filters;
+  const sel=def=>'<label class="fsel"><span>'+def.label.replace(' (Group ID)','')+'</span><select data-f="'+def.key+'">'+
+    def.opts.map(o=>{const n=o[0]==='all'?state.list.length:countBy(def.key,o[0]);
+      return '<option value="'+esc(o[0])+'"'+(f[def.key]===o[0]?' selected':'')+(n||o[0]==='all'?'':' disabled')+'>'+esc(o[1])+' · '+n+'</option>';}).join('')+'</select></label>';
+  $('#filters').innerHTML=
+    '<div class="fsearch"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg>'+
+      '<input id="fSearch" type="search" placeholder="Поиск по ID диалога" value="'+esc(f.q)+'" autocomplete="off"><kbd title="Горячая клавиша">/</kbd></div>'+
+    '<div class="fgrid">'+filterDefs().map(sel).join('')+'</div>'+
+    '<label class="fsel fsort"><span>Сортировка</span><select data-f="sort">'+SORTS.map(o=>'<option value="'+o[0]+'"'+(f.sort===o[0]?' selected':'')+'>'+o[1]+'</option>').join('')+'</select></label>'+
+    ((f.dataset!=='all'||f.channel!=='all'||f.lang!=='all'||f.status!=='all'||f.q)?'<button class="linkbtn" id="fReset">Сбросить фильтры</button>':'');
+}
+function attention(d){
+  if(!d.evaluation)return 3;
+  let s=0;if(d.open_appeals)s+=10;if(d.evaluation.gross_error)s+=8;if(d.evaluation.errors&&d.evaluation.errors.length)s+=6;if(d.evaluation.stale)s+=2;
+  return s+(100-(d.evaluation.total||0))/100;
 }
 function filtered(){
-  const f=state.filters;
-  return state.list.filter(d=>(f.dataset==='all'||d.dataset===f.dataset)&&(f.channel==='all'||chan(d.channel)===f.channel)&&(f.lang==='all'||d.language===f.lang)&&(f.status==='all'||d.status===f.status));
+  const f=state.filters,q=f.q.trim().toLowerCase();
+  const out=state.list.filter(d=>(f.dataset==='all'||d.dataset===f.dataset)&&(f.channel==='all'||chan(d.channel)===f.channel)&&(f.lang==='all'||d.language===f.lang)&&(f.status==='all'||d.status===f.status)&&(!q||d.conversation_id.toLowerCase().indexOf(q)>=0));
+  const tot=d=>d.evaluation&&d.evaluation.total!=null?d.evaluation.total:null;
+  const lo=d=>{const t=tot(d);return t===null?1e9:t;},hi=d=>{const t=tot(d);return t===null?-1:t;};
+  if(f.sort==='score_asc')out.sort((a,b)=>lo(a)-lo(b));
+  else if(f.sort==='score_desc')out.sort((a,b)=>hi(b)-hi(a));
+  else if(f.sort==='attention')out.sort((a,b)=>attention(b)-attention(a));
+  else if(f.sort==='id')out.sort((a,b)=>a.conversation_id.localeCompare(b.conversation_id));
+  return out;
 }
 function renderListActions(){
   const list=filtered();
@@ -605,10 +704,9 @@ function renderList(){
     const dots=ev?'<div class="dots">'+cl.criteria.map(c=>{
       const v=uiVal(c,ev.answers[c.id]);const k=v===undefined?'':v==='N/A'?'na':valCls(c,v);
       return '<span class="dot '+k+'" title="'+esc(c.name)+': '+esc(plainVal(c,v))+'"></span>';}).join('')+'</div>':'';
-    return '<div class="li'+(d.conversation_id===state.selectedId?' sel':'')+'" data-id="'+esc(d.conversation_id)+'" tabindex="0">'+
+    return '<div class="li'+(d.conversation_id===state.selectedId?' sel':'')+'" data-id="'+esc(d.conversation_id)+'" tabindex="0" title="'+esc(d.dataset+' · '+d.messages+' сообщ.'+(d.has_audio?' · есть запись':''))+'">'+
       '<div class="li-top"><span class="ico">'+ICON[ch]+'</span><b>'+esc(d.conversation_id)+'</b>'+
         (state.evaluating.has(d.conversation_id)?'<span class="spin"></span>':ev?'<span class="sc-pill '+scoreCls(fin)+'">'+fmt(fin)+'</span>':'')+'</div>'+
-      '<div class="li-meta">'+esc(d.dataset)+' · '+d.messages+' сообщ.'+(d.has_audio?' · запись':'')+'</div>'+
       '<div class="li-badges"><span class="b lang">'+esc(d.language||'')+'</span><span class="b lang">'+(ch==='chat'?'Чат':'Звонок')+'</span>'+statusBadge(d.status)+
         (ev&&ev.gross_error?'<span class="b err">Грубая ошибка</span>':'')+(ev&&ev.stale?'<span class="b gray" title="Оценено прошлой версией чек-листа">стар. чек-лист</span>':'')+
         (ev&&ev.errors&&ev.errors.length?'<span class="b err">сбой ИИ</span>':'')+'</div>'+
@@ -634,13 +732,54 @@ function renderTranscript(){
       '<select id="aSpeed" aria-label="Скорость"><option value="1">1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="2">2×</option></select>'+
       '<a class="src" href="'+esc(d.audio_page)+'" target="_blank" title="Плеер организаторов">Запись звонка · позиции реплик учитывают паузы записи</a></div></div>';
   }
-  html+='<div class="t-scroll" id="tScroll">'+d.messages.map(m=>
-    '<div class="msg '+esc(m.speaker)+'" id="msg-'+m.id+'"><div class="bubble"><div class="m-head"><span><span class="mid">'+m.id+'</span>'+esc(speakerLabel(m))+'</span>'+
-    '<button class="t" data-mid="'+m.id+'" title="'+esc(m.ts)+(m.audio_sec!=null?' · в записи '+fmtSec(m.audio_sec):'')+'">'+esc(m.clock)+(d.has_audio&&m.audio_sec!=null?' ▶':'')+'</button></div><div class="m-text">'+esc(m.text)+'</div></div></div>'
+  const marks=evidenceMarks(d);
+  const nBot=d.messages.filter(m=>m.speaker==='bot').length;
+  html+='<div class="t-tools"><div class="tsearch"><input id="tSearch" type="search" placeholder="Найти в диалоге…" value="'+esc(state.tq)+'" autocomplete="off"><span id="tCount"></span></div>'+
+    (nBot?'<label class="tgl"><input type="checkbox" id="hideBot"'+(state.hideBot?' checked':'')+'> Скрыть бота ('+nBot+')</label>':'')+
+    (d.evaluation?'<span class="t-legend" title="Метки у реплик — номера критериев, для которых ИИ использовал реплику как доказательство. Клик откроет критерий.">№ у реплики = доказательство ИИ</span>':'')+'</div>';
+  html+='<div class="t-scroll'+(state.hideBot?' nobot':'')+'" id="tScroll">'+d.messages.map(m=>
+    '<div class="msg '+esc(m.speaker)+(marks[m.id]?' has-ev':'')+'" id="msg-'+m.id+'"><div class="bubble"><div class="m-head"><span><span class="mid">'+m.id+'</span>'+esc(speakerLabel(m))+'</span>'+
+    '<span class="m-right">'+(marks[m.id]||[]).map(x=>'<button class="emark '+x.cls+'" data-cid="'+esc(x.cid)+'" title="'+esc(x.title)+'">'+x.no+'</button>').join('')+
+    '<button class="t" data-mid="'+m.id+'" title="'+esc(m.ts)+(m.audio_sec!=null?' · в записи '+fmtSec(m.audio_sec):'')+'">'+esc(m.clock)+(d.has_audio&&m.audio_sec!=null?' ▶':'')+'</button></span></div><div class="m-text">'+esc(m.text)+'</div></div></div>'
   ).join('')+'</div>';
   pane.innerHTML=html;
   pane.style.display='contents';
   if(d.has_audio)bindAudio(d);
+  if(state.tq)searchTranscript(state.tq,false);
+}
+/* метки у реплик: какие критерии ссылаются на реплику как на доказательство */
+function evidenceMarks(d){
+  const out={},ev=d.evaluation;if(!ev)return out;
+  const cl=ev.checklist_snapshot;
+  ev.criteria.forEach(item=>{
+    const c=cl.criteria.find(x=>x.id===item.criterion_id);if(!c)return;
+    const v=uiVal(c,ev.final_answers[c.id]);
+    (item.evidence||[]).forEach(e=>{
+      out[e.msg_id]=out[e.msg_id]||[];
+      if(out[e.msg_id].some(x=>x.cid===c.id))return;
+      out[e.msg_id].push({cid:c.id,no:critNo(cl,c.id),cls:v==='N/A'?'na':valCls(c,v),title:critNo(cl,c.id)+'. '+c.name+': '+plainVal(c,v)+(e.why?' — '+e.why:'')});
+    });
+  });
+  return out;
+}
+function searchTranscript(q,jump){
+  state.tq=q;
+  const qq=q.trim().toLowerCase();const hits=[];
+  $$('#tScroll .msg').forEach(el=>{
+    const on=!!qq&&el.querySelector('.m-text').textContent.toLowerCase().indexOf(qq)>=0;
+    el.classList.toggle('match',on);if(on)hits.push(el);
+  });
+  const cnt=$('#tCount');if(cnt)cnt.textContent=qq?(hits.length?hits.length+' совп.':'нет'):'';
+  if(jump&&hits.length){
+    state.tqIdx=((state.tqIdx===undefined?-1:state.tqIdx)+1)%hits.length;
+    hits[state.tqIdx].scrollIntoView({behavior:'smooth',block:'center'});
+  }
+}
+function openCriterion(cid){
+  const d=state.detail;if(!d||!d.evaluation)return;
+  const key=d.conversation_id+':'+cid;state.open.add(key);renderScorecard();
+  const el=$('#scorePane .acc[data-key="'+CSS.escape(key)+'"]');
+  if(el){el.scrollIntoView({behavior:'smooth',block:'start'});el.classList.remove('flashc');void el.offsetWidth;el.classList.add('flashc');}
 }
 function bindAudio(d){
   const a=$('#audioEl');state.audioEl=a;
@@ -679,7 +818,8 @@ function evChips(list){
   return (list||[]).map(e=>{
     const m=msgById(e.msg_id);
     const snip=e.quote||(m?m.text:'');
-    return '<button class="ev" data-mid="'+esc(e.msg_id)+'" title="'+esc((e.why?e.why+' — ':'')+'перейти к реплике')+'"><span class="tm">▶ '+esc(m?m.clock:e.msg_id)+'</span><span class="snip">'+esc(snip.slice(0,80))+'</span></button>';
+    const vf=e.verified===false?'<span class="vq bad" title="Цитата не найдена в тексте реплики — проверьте вручную">⚠</span>':e.verified?'<span class="vq ok" title="Цитата сверена с текстом реплики">✓</span>':'';
+    return '<button class="ev'+(e.verified===false?' unverified':'')+'" data-mid="'+esc(e.msg_id)+'" title="'+esc((e.why?e.why+' — ':'')+'перейти к реплике')+'">'+vf+'<span class="tm">▶ '+esc(m?m.clock:e.msg_id)+'</span><span class="snip">'+esc(snip.slice(0,80))+'</span></button>';
   }).join('');
 }
 
@@ -726,6 +866,11 @@ function critItem(ev,c,i){
     body+='<div class="kv"><div class="k">Доказательства в диалоге</div><div>'+evChips(item.evidence)+
       (item.checked_range?'<button class="ev range" data-mid="'+esc(item.checked_range.from_msg)+'" data-range="'+esc(item.checked_range.from_msg+','+item.checked_range.to_msg)+'" title="Участок, где ИИ искал действие"><span class="tm">⇕ '+esc((msgById(item.checked_range.from_msg)||{}).clock||'')+'–'+esc((msgById(item.checked_range.to_msg)||{}).clock||'')+'</span><span class="snip">проверенный участок разговора</span></button>':'')+'</div></div>';
   }
+  const vr=item.verification;
+  if(vr&&vr.verdict==='changed')body+='<div class="box selfcheck changed"><div class="h">↻ Самопроверка ИИ исправила ответ: '+esc(plainVal(c,uiVal(c,vr.from)))+' → '+esc(plainVal(c,uiVal(c,vr.to)))+'</div>'+esc(vr.reason)+'</div>';
+  else if(vr&&vr.verdict==='confirmed')body+='<div class="box selfcheck"><div class="h">✓ Самопроверка подтвердила ответ</div>Ответ рискованный (снижает балл или N/A), поэтому его независимо перепроверил второй проход ИИ.</div>';
+  const nPrec=(state.precedents||[]).filter(x=>x.criterion_id===c.id&&x.conversation_id!==ev.conversation_id).length;
+  if(nPrec)body+='<div class="kv"><div class="k">Обучение на апелляциях</div><div style="font-size:12px;color:var(--n80)">ИИ учитывает '+nPrec+' прецедент(а) супервизора по этому критерию из других диалогов (действует для новых оценок).</div></div>';
   if(item.analysis)body+='<details class="reason"><summary>Ход рассуждения модели</summary><p>'+esc(item.analysis)+'</p></details>';
   if(item.votes)body+='<div class="kv"><div class="k">Голоса прогонов</div><div>'+Object.entries(item.votes).map(([k,n])=>valBadge(c,uiVal(c,k))+'×'+n).join(' ')+'</div></div>';
   body+='<div class="kv"><div class="k">Расчёт</div><div class="calc">'+calc+'</div></div>';
@@ -754,13 +899,39 @@ function critItem(ev,c,i){
   const effTag=c.type==='flag'?'флаг':'вес '+c.weight+(si.effective_weight&&Math.abs(si.effective_weight-c.weight)>0.004?' → '+fmt(si.effective_weight):'');
   return '<div class="acc'+(open?' open':'')+(openAppeal?' has-appeal':'')+'" data-key="'+esc(key)+'">'+
     '<div class="acc-head" role="button" tabindex="0" aria-expanded="'+open+'">'+CHEV+
-      '<span class="code">'+pad(i+1)+'</span><span class="cname">'+esc(c.name)+'</span>'+
+      '<span class="code">'+pad(i+1)+'</span><span class="cname">'+esc(c.name)+(item.rationale?'<span class="rprev">'+esc(shortReason(item.rationale))+'</span>':'')+'</span>'+
       '<span class="acc-right"><span class="wtag">'+effTag+'</span>'+
       valBadge(c,v)+(revChanged?'<span class="b gray" title="Оценка изменена супервизором">пересм.</span>':'')+appBadge+
       (item.confidence==='low'?'<span class="b warn" title="Низкая уверенность модели">?</span>':'')+
+      (item.verification&&item.verification.verdict==='changed'?'<span class="b info" title="Самопроверка ИИ исправила ответ">↻</span>':item.verification&&item.verification.verdict==='confirmed'?'<span class="b ok sc-ok" title="Ответ подтверждён самопроверкой ИИ">✓✓</span>':'')+
       (canAppeal?'<button class="btn sm danger btn-appeal" data-cid="'+c.id+'">Оспорить</button>':'')+
       '</span></div>'+
     '<div class="acc-body">'+body+'</div></div>';
+}
+function reliabilityBlock(ev){
+  const r=ev.reliability;if(!r)return '';
+  const q=r.quotes_total?Math.round(r.quotes_verified/r.quotes_total*100):100;
+  const level=(q===100&&!r.low_confidence)?'ok':(q>=90?'warn':'err');
+  return '<div class="rel '+level+'" title="Насколько можно доверять этой оценке">'+
+    '<div class="rel-t">Надёжность оценки</div>'+
+    '<div class="rel-i"><b>'+r.quotes_verified+'/'+r.quotes_total+'</b><span>цитат сверено с текстом</span></div>'+
+    '<div class="rel-i"><b>'+r.self_checked+'</b><span>рискованных ответов перепроверено</span></div>'+
+    '<div class="rel-i"><b>'+r.self_corrected+'</b><span>исправлено самопроверкой</span></div>'+
+    '<div class="rel-i"><b>'+r.low_confidence+'</b><span>с низкой уверенностью</span></div></div>';
+}
+function coachingBlock(ev){
+  const co=ev.coaching;
+  if(!co)return '<div class="coach empty-coach"><div><b>Рекомендации оператору</b><div class="small-muted">ИИ-наставник: что улучшить и какой фразой — на языке клиента</div></div><button class="btn sm" id="btnCoach">Получить советы</button></div>';
+  return '<div class="coach"><div class="coach-h"><b>Рекомендации оператору</b><button class="linkbtn" id="btnCoach">обновить</button></div>'+
+    '<div class="coach-sum">'+esc(co.summary)+'</div>'+
+    (co.strengths&&co.strengths.length?'<div class="coach-k">Сильные стороны</div><ul class="coach-ul">'+co.strengths.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>':'')+
+    (co.tips&&co.tips.length?'<div class="coach-k">Что улучшить</div>'+co.tips.map(t=>'<div class="tip"><div class="tip-h"><span class="b gray">'+esc(t.criterion)+'</span>'+(msgById(t.msg_id)?'<button class="ev" data-mid="'+esc(t.msg_id)+'"><span class="tm">▶ '+esc(msgById(t.msg_id).clock)+'</span></button>':'')+'</div>'+
+      '<div>'+esc(t.problem)+'</div><div class="better">Лучше сказать: «'+esc(t.better_phrase)+'»</div></div>').join(''):'<div class="small-muted">Замечаний нет.</div>')+
+    (co.for_total!=null&&co.for_total!==ev.final_score.total?'<div class="small-muted">Советы даны при итоге '+fmt(co.for_total)+' — после пересмотра можно обновить.</div>':'')+'</div>';
+}
+function shortReason(r){
+  // «Завершение — Нет. После ответа…» → «После ответа…»: название и ответ уже видны в строке
+  return String(r).replace(/^[^.—–]{0,90}\s[—–-]\s*[^.]{0,40}\.\s*/,'');
 }
 function historyItems(d){
   const items=[];
@@ -814,6 +985,8 @@ function renderScorecard(){
       '<div class="aimeta">Модель '+esc(ev.model)+' · вызовов '+ev.llm_calls+' · '+(ev.usage.input+ev.usage.output)+' токенов · ≈$'+(ev.cost_usd||0).toFixed(4)+' · '+ev.duration_s+' с · чек-лист v'+ev.checklist_version+'</div>'+
       '<div class="sc-actions">'+evalBtn+'</div></div></div>'+
     (fs.sections&&fs.sections.length?'<div class="sections">'+fs.sections.map(s=>'<div class="secbox"><div class="n">'+esc(s.name)+'</div><div class="v">'+(s.points==null?'N/A':fmt(s.points)+' <span style="font-weight:400;color:var(--n80);font-size:11px">/ '+fmt(s.max_points)+'</span>')+'</div><div class="bar"><div style="width:'+(s.percent||0)+'%"></div></div></div>').join('')+'</div>':'')+
+    reliabilityBlock(ev)+
+    coachingBlock(ev)+
     (stale?'<div class="notice warn">Оценено версией чек-листа v'+ev.checklist_version+', активна v'+state.checklist.version+'. Нажмите «Переоценить ИИ» — изменённые критерии будут оценены заново.</div>':'')+
     (ev.errors&&ev.errors.length?'<div class="notice warn">ИИ не смог оценить: '+ev.errors.map(id=>esc((cl.criteria.find(c=>c.id===id)||{}).name||id)).join(', ')+'. Попробуйте переоценить.</div>':'')+
     gross+
@@ -1038,7 +1211,7 @@ function setView(v){
   $('#viewDialogs').classList.toggle('active',v==='dialogs');
   $('#viewSettings').classList.toggle('active',v==='settings');
   $('#viewStats').classList.toggle('active',v==='stats');
-  if(v==='settings'){if(!state.draft)newDraft();renderSettings();}
+  if(v==='settings'){if(!state.draft)newDraft();renderSettings();loadPrecedents();}
   if(v==='stats')renderStats();
 }
 function setRole(r){
@@ -1098,10 +1271,20 @@ function bind(){
   $('#btnLoad').addEventListener('click',loadFromServer);
   $('#groupId').addEventListener('keydown',e=>{if(e.key==='Enter')loadFromServer();});
 
+  $('#filters').addEventListener('change',e=>{
+    const s=e.target.closest('select[data-f]');if(!s)return;
+    state.filters[s.dataset.f]=s.value;
+    if(s.dataset.f==='dataset')$('#envPill').textContent=s.value==='all'?(state.datasets.join(' · ')||'—'):s.value;
+    renderFilters();renderList();renderListActions();
+  });
+  $('#filters').addEventListener('input',e=>{
+    if(e.target.id!=='fSearch')return;
+    state.filters.q=e.target.value;renderList();renderListActions();
+  });
   $('#filters').addEventListener('click',e=>{
-    const b=e.target.closest('.chip');if(!b)return;
-    state.filters[b.dataset.f]=b.dataset.v;
-    if(b.dataset.f==='dataset')$('#envPill').textContent=b.dataset.v==='all'?(state.datasets.join(' · ')||'—'):b.dataset.v;
+    if(e.target.id!=='fReset')return;
+    Object.assign(state.filters,{dataset:'all',channel:'all',lang:'all',status:'all',q:''});
+    $('#envPill').textContent=state.datasets.join(' · ')||'—';
     renderFilters();renderList();renderListActions();
   });
   $('#listActions').addEventListener('click',e=>{
@@ -1116,7 +1299,18 @@ function bind(){
   $('#dlgList').addEventListener('click',pick);
   $('#dlgList').addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();pick(e);}});
 
+  $('#transcriptPane').addEventListener('input',e=>{
+    if(e.target.id==='tSearch'){state.tqIdx=-1;searchTranscript(e.target.value,true);}
+  });
+  $('#transcriptPane').addEventListener('keydown',e=>{
+    if(e.target.id==='tSearch'&&e.key==='Enter'){e.preventDefault();searchTranscript(e.target.value,true);}
+  });
+  $('#transcriptPane').addEventListener('change',e=>{
+    if(e.target.id==='hideBot'){state.hideBot=e.target.checked;$('#tScroll').classList.toggle('nobot',state.hideBot);}
+  });
   $('#transcriptPane').addEventListener('click',e=>{
+    const mk=e.target.closest('.emark');if(mk){openCriterion(mk.dataset.cid);return;}
+    const bb=e.target.closest('.msg.bot .bubble');if(bb&&!e.target.closest('.t')){bb.parentElement.classList.toggle('full');}
     const t=e.target.closest('.m-head .t');
     if(t&&state.audioEl){const m=msgById(t.dataset.mid);if(m&&m.audio_sec!=null){state.audioEl.currentTime=m.audio_sec;state.audioEl.play().catch(()=>{});}}
   });
@@ -1133,6 +1327,13 @@ function bind(){
   });
   sp.addEventListener('click',async e=>{
     if(e.target.closest('#btnEvalOne')){evaluateOne(state.selectedId);return;}
+    const cb=e.target.closest('#btnCoach');
+    if(cb){
+      const d=state.detail;busy(cb,true,'Готовлю советы…');
+      try{d.evaluation.coaching=await api('/evaluations/'+d.evaluation.id+'/coaching',{method:'POST'});renderScorecard();}
+      catch(err){busy(cb,false);toast(err.message,'err');}
+      return;
+    }
     const ev=e.target.closest('.ev');if(ev){goToMsg(ev.dataset.mid,ev.dataset.range?ev.dataset.range.split(','):null);return;}
     const ap=e.target.closest('.btn-appeal');if(ap){e.stopPropagation();openAppeal(ap.dataset.cid);return;}
     const sv=e.target.closest('.save-verdict');
@@ -1152,7 +1353,8 @@ function bind(){
         state.open.add(d.conversation_id+':'+cid);
         await Promise.all([loadDetail(d.conversation_id),loadList()]);
         renderScorecard();
-        toast('Вердикт сохранён. Статус: «Пересмотрено». Балл: ['+fmt(before)+'] → ['+fmt(upd.final_score.total)+']','ok');
+        if(val!==prev)loadPrecedents();
+        toast('Вердикт сохранён. Балл: ['+fmt(before)+'] → ['+fmt(upd.final_score.total)+']'+(val!==prev?'. Решение сохранено как прецедент — ИИ учтёт его в следующих оценках.':''),'ok',6500);
       }catch(err){busy(sv,false);toast(err.message,'err');}
       return;
     }
@@ -1172,6 +1374,22 @@ function bind(){
   });
   sp.addEventListener('keydown',e=>{
     if((e.key==='Enter'||e.key===' ')&&e.target.classList.contains('acc-head')){e.preventDefault();e.target.click();}
+  });
+
+  /* клавиатура: ↑/↓ или j/k — соседний диалог, / — поиск */
+  document.addEventListener('keydown',e=>{
+    if(state.view!=='dialogs'||$('#modal').classList.contains('show'))return;
+    const tag=(e.target.tagName||'').toLowerCase();
+    if(tag==='input'||tag==='textarea'||tag==='select'||e.ctrlKey||e.metaKey||e.altKey)return;
+    if(e.key==='/'){e.preventDefault();const s=$('#fSearch');if(s){s.focus();s.select();}return;}
+    const dir=(e.key==='ArrowDown'||e.key==='j')?1:(e.key==='ArrowUp'||e.key==='k')?-1:0;
+    if(!dir)return;
+    const list=filtered();if(!list.length)return;
+    e.preventDefault();
+    let i=list.findIndex(d=>d.conversation_id===state.selectedId);
+    i=i<0?0:Math.min(list.length-1,Math.max(0,i+dir));
+    selectDialog(list[i].conversation_id);
+    const li=$('#dlgList .li[data-id="'+CSS.escape(list[i].conversation_id)+'"]');if(li)li.scrollIntoView({block:'nearest'});
   });
 
   /* модалка */
@@ -1245,6 +1463,11 @@ function bind(){
   });
   $('#btnApply').addEventListener('click',applyConfig);
   $('#btnToDialogs').addEventListener('click',()=>setView('dialogs'));
+  $('#viewSettings').addEventListener('click',async e=>{
+    const b=e.target.closest('.prec-del');if(!b)return;
+    try{await api('/precedents/'+encodeURIComponent(b.dataset.id),{method:'DELETE'});await loadPrecedents();toast('Прецедент убран','info',2000);}
+    catch(err){toast(err.message,'err');}
+  });
 }
 
 /* =====================================================================
@@ -1254,7 +1477,7 @@ async function init(){
   bind();
   renderTranscript();renderScorecard();
   try{
-    await Promise.all([loadHealth(),loadChecklist()]);
+    await Promise.all([loadHealth(),loadChecklist(),loadPrecedents()]);
     await loadList();
     const first=filtered()[0];
     if(first)selectDialog(first.conversation_id);
