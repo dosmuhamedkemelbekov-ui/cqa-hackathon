@@ -64,7 +64,10 @@ def model_info() -> dict:
     base = (config.LLM_BASE_URL or "").lower()
     local = any(h in base for h in ("localhost", "127.0.0.1", "0.0.0.0", "ollama"))
     mode = os.getenv("CQA_MODEL_MODE") or ("local" if local else "external_api")
-    return {"mode": mode, "name": os.getenv("CQA_MODEL_NAME") or config.LLM_MODEL}
+    name = os.getenv("CQA_MODEL_NAME") or config.LLM_MODEL
+    if not os.getenv("CQA_MODEL_NAME") and config.LLM_FALLBACK_MODEL and config.LLM_FALLBACK_MODEL != config.LLM_MODEL:
+        name += ", " + config.LLM_FALLBACK_MODEL  # по правилам: если моделей несколько — перечислить все
+    return {"mode": mode, "name": name}
 
 
 def conversation_result(conv: dict, ev: dict | None, use: str = "ai", fail_reason: str | None = None) -> dict:

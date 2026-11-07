@@ -419,7 +419,7 @@ async def evaluate(conv: dict, checklist: dict, samples: int | None = None, prev
         for k in usage:
             usage[k] += r["usage"][k]
     meta = {
-        "model": config.LLM_MODEL,
+        "model": ", ".join(llm.models_used()),
         "samples": samples,
         "eval_mode": config.EVAL_MODE,
         "llm_calls": (len(results) * samples if config.EVAL_MODE != "single"
