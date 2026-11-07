@@ -375,6 +375,9 @@ async def evaluate(conv: dict, checklist: dict, samples: int | None = None, prev
     samples = samples or int(getattr(config, "LLM_SAMPLES", 1) or 1)
     t0 = time.time()
     prepared = preprocess.prepare(conv)
+    if not any((m.get("text") or "").strip() for m in prepared["messages"]):
+        # Нечего оценивать: в results.json такой диалог уходит со status="error" и причиной, а не с выдуманным баллом.
+        raise RuntimeError("Пустой транскрипт — в диалоге нет ни одной реплики, оценивать нечего")
     if config.RULES_ENABLED:
         prepared["facts"]["rule_hints"] = rules.facts_lines(conv, prepared)
     reused: dict[str, dict] = {}

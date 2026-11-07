@@ -101,7 +101,9 @@ def apply(conv: dict, checklist: dict, prepared: dict, results: dict[str, dict])
                      "llm_rationale": prev.get("llm_rationale", r.get("rationale") or "")}
         if before != answer:
             r["answer"] = answer
-            r["rationale"] = f"{why} (Решение по правилу; ИИ ответил: {before}.) " + r["rule"]["llm_rationale"]
+            # В объяснении — только причина правила: рассуждение модели вело к другому ответу и противоречило бы ему.
+            # Оно сохраняется в rule.llm_rationale и показывается в карточке.
+            r["rationale"] = f"{why} Основание — проверка по правилу."
             if msg_id and not any(e.get("msg_id") == msg_id for e in r.get("evidence") or []):
                 m = next((x for x in msgs if x["id"] == msg_id), None)
                 if m:

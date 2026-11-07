@@ -6,14 +6,29 @@
 
 ```bash
 pip install -r requirements.txt
-cp .env.example .env          # впишите OPENAI_API_KEY (или OPENAI_BASE_URL для локальной модели)
-python scripts/load_dev.py DEV # загрузить DEV-набор из API организаторов (или путь к JSON-файлу)
+cp .env.example .env              # Windows: copy .env.example .env — впишите ключ модели (ниже)
+python scripts/check_llm.py       # проверка ключа и модели: должно быть «OK»
+python scripts/load_dev.py DEV    # DEV-набор из API организаторов (или: python scripts/load_dev.py data/dev.json)
 python -m uvicorn backend.app:app --port 8000
 ```
 
-Откройте http://localhost:8000.
+Откройте http://localhost:8000. На Windows вместо `python` используйте `py`. Без загруженных диалогов главная страница сама предложит «Загрузить набор DEV».
 
-Контрольный набор можно загрузить прямо из интерфейса: введите `group_id` → «Загрузить из API» → «Оценить неоценённые».
+**Модель, на которой сдаём** — Google Gemini через OpenAI-совместимый API (бесплатный ключ: aistudio.google.com → Get API key):
+
+```
+OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/
+OPENAI_API_KEY=<ключ Gemini>
+CQA_MODEL=gemini-3.5-flash
+CQA_FALLBACK_MODEL=gemini-3.5-flash-lite   # при дневном лимите основной оценка продолжается этой моделью
+CQA_EVAL_MODE=single                       # 1 вызов модели на диалог (все критерии сразу)
+CQA_RPM=4                                  # не больше 4 запросов в минуту (бесплатный тариф)
+CQA_TEAM_NAME=DOSTEAM
+```
+
+Подходит и любая другая модель: OpenAI, Claude (`CQA_PROVIDER=anthropic`), локальная через Ollama (`OPENAI_BASE_URL=http://localhost:11434/v1`) — см. `.env.example`.
+
+Контрольный набор: `python scripts/run_prod.py <group_id> --team "DOSTEAM" --push` (подробно — ниже) или из интерфейса: код набора в меню → «Загрузить» → «Оценить ИИ».
 
 ## Сдача результатов (формат организаторов JSON 1.0)
 
