@@ -64,6 +64,11 @@ STT_BASE_URL = os.getenv("CQA_STT_BASE_URL") or LLM_BASE_URL
 # ---- Режим оценки ----
 # per_criterion — отдельный вызов на каждый критерий (точнее, 8+ вызовов на диалог);
 # single — все критерии в одном вызове (1 вызов на диалог) — для бесплатных тарифов с дневным лимитом.
+# Резервная модель того же провайдера: включается, когда у основной кончился дневной лимит.
+LLM_FALLBACK_MODEL = os.getenv("CQA_FALLBACK_MODEL", "").strip()
+# Сколько секунд ждать ответа модели («думающие» модели отвечают дольше).
+LLM_TIMEOUT = float(os.getenv("CQA_LLM_TIMEOUT", "180"))
+RULES_ENABLED = os.getenv("CQA_RULES", "1") not in ("0", "false", "no")  # детерминированные правила поверх LLM
 EVAL_MODE = os.getenv("CQA_EVAL_MODE", "per_criterion").strip().lower()
 # Ограничение запросов в минуту к LLM (0 — без ограничения). Для бесплатных тарифов: 10–15.
 LLM_RPM = float(os.getenv("CQA_RPM", "0"))

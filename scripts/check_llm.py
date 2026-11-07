@@ -46,10 +46,15 @@ async def main() -> int:
             print("Впишите одну из них в CQA_MODEL в .env (полный список: py scripts/check_llm.py --models).")
             return 1
     t0 = time.time()
+    print("Жду ответ модели (до 2 минут; «думающие» модели отвечают дольше)…", flush=True)
     try:
-        data, usage = await llm.complete_json(
+        data, usage = await asyncio.wait_for(llm.complete_json(
             "Ответь строго JSON по схеме.", "Оператор поздоровался? Реплика: «Здравствуйте, меня зовут Алина». "
-            "answer: yes или no.", SCHEMA, name="check")
+            "answer: yes или no.", SCHEMA, name="check"), timeout=120)
+    except asyncio.TimeoutError:
+        print("Модель не ответила за 2 минуты — она перегружена или слишком медленная на бесплатном тарифе. "
+              "Попробуйте позже или другую модель (например, gemini-3.5-flash).")
+        return 1
     except Exception as e:  # noqa: BLE001
         print(f"ОШИБКА через {time.time() - t0:.1f} с:\n{e}")
         return 1

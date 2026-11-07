@@ -195,6 +195,7 @@ def facts_text(facts: dict) -> str:
         lines.append(f"- Последнее сообщение диалога: {facts['last_message']['id']} ({ROLE_LABEL.get(facts['last_message']['speaker'], '')}).")
     if facts["client_messages_after_last_operator"]:
         lines.append(f"- Сообщения клиента после последней реплики оператора: {', '.join(facts['client_messages_after_last_operator'])}.")
+    lines.extend(facts.get("rule_hints") or [])
     if facts["long_operator_pauses"]:
         p = "; ".join(f"{x['client_msg']}→{x['operator_reply']} {x['seconds']} c" for x in facts["long_operator_pauses"])
         lines.append(f"- Долгие ответы оператора после первой реакции (клиент→ответ): {p}. Проверь, предупреждал ли оператор об ожидании до паузы.")

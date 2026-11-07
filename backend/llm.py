@@ -23,7 +23,8 @@ _unsupported: set[str] = set()
 def client() -> AsyncOpenAI:
     global _client
     if _client is None:
-        _client = AsyncOpenAI(api_key=config.LLM_API_KEY or "local", base_url=config.LLM_BASE_URL, max_retries=3)
+        _client = AsyncOpenAI(api_key=config.LLM_API_KEY or "local", base_url=config.LLM_BASE_URL, max_retries=3,
+                              timeout=config.LLM_TIMEOUT)
     return _client
 
 
@@ -116,7 +117,32 @@ async def complete_json(system: str, user: str, schema: dict, name: str, model: 
     на её конце ставится точка кэша."""
     if config.LLM_PROVIDER == "anthropic":
         return await _complete_anthropic(system, user, schema, user_prefix)
-    return await _complete_openai(system, user, schema, name, model, cache_key, user_prefix)
+    primary = model or config.LLM_MODEL
+    fb = config.LLM_FALLBACK_MODEL
+    if fb and fb != primary and primary in _exhausted:
+        return await _complete_openai(system, user, schema, name, fb, cache_key, user_prefix)
+    try:
+        return await _complete_openai(system, user, schema, name, model, cache_key, user_prefix)
+    except RuntimeError as e:
+        # Дневной лимит/лимит 0 у основной модели — переключаемся на резервную до перезапуска сервера.
+        if fb and fb != primary and ("дневной лимит" in str(e) or "лимит 0" in str(e)):
+            if primary not in _exhausted:
+                log(f"у {primary} кончился дневной лимит — дальше оцениваю резервной моделью {fb}")
+            _exhausted.add(primary)
+            return await _complete_openai(system, user, schema, name, fb, cache_key, user_prefix)
+        raise
+
+
+# Модели, у которых в этом запуске кончился дневной лимит (переходим на CQA_FALLBACK_MODEL).
+_exhausted: set[str] = set()
+
+
+def models_used() -> list[str]:
+    """Какие модели реально оценивали: основная и, если включалась, резервная."""
+    out = [config.LLM_MODEL]
+    if config.LLM_FALLBACK_MODEL and _exhausted:
+        out.append(config.LLM_FALLBACK_MODEL)
+    return out
 
 
 async def _complete_openai(system: str, user: str, schema: dict, name: str, model: str | None = None,

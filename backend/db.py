@@ -67,8 +67,27 @@ def init() -> None:
         _conn.commit()
     if not list_checklists():
         cl = json.loads(DEFAULT_CHECKLIST.read_text(encoding="utf-8"))
-        save_checklist(cl)
+        save_checklist({**cl, "source": "default"})
         set_setting("active_checklist", cl["id"])
+    else:
+        _upgrade_default()
+
+
+_META = ("version", "saved_at", "active", "versions", "source")
+
+
+def _upgrade_default() -> None:
+    """Обновлённый регламент из checklists/default.json применяется к существующей базе автоматически —
+    но только если чек-лист не правили вручную (последняя версия — исходная)."""
+    cl = json.loads(DEFAULT_CHECKLIST.read_text(encoding="utf-8"))
+    latest = get_checklist(cl["id"])
+    if not latest or latest.get("source") == "user":
+        return
+    strip = lambda c: {k: v for k, v in c.items() if k not in _META}  # noqa: E731
+    if strip(latest) == strip(cl):
+        return
+    if latest.get("source") == "default" or latest.get("version") == 1:
+        save_checklist({**cl, "source": "default"})
 
 
 # ---------- settings ----------
