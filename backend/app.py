@@ -321,8 +321,10 @@ async def _run_job(job_id: str, conv_ids: list[str], cl: dict, samples: int | No
             job["llm_calls"] += ev["llm_calls"]
             job["results"].append({"conversation_id": cid, "before": ev.get("previous_total"),
                                    "after": ev["final_score"]["total"], "ai_after": ev["original_score"]["total"]})
+            llm.log(f"✔ {cid}: {ev['final_score']['total']} ({job['done'] + 1}/{job['total']}, {ev['duration_s']} с)")
         except Exception as e:  # noqa: BLE001
             job["failed"].append({"conversation_id": cid, "error": str(e)})
+            llm.log(f"✘ {cid}: {str(e)[:300]}")
         finally:
             job["done"] += 1
 

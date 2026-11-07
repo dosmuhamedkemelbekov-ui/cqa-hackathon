@@ -4,6 +4,9 @@
 Остальной код вызывает только complete_json() и не зависит от провайдера."""
 import asyncio
 import json
+import re
+import sys
+import time
 
 from openai import APIConnectionError, APIStatusError, AsyncOpenAI, BadRequestError, RateLimitError
 
@@ -42,6 +45,17 @@ def provider_info() -> dict:
         return {"provider": "anthropic", "model": config.CLAUDE_MODEL, "base_url": config.ANTHROPIC_BASE_URL,
                 "effort": config.CLAUDE_EFFORT}
     return {"provider": "openai", "model": config.LLM_MODEL, "base_url": config.LLM_BASE_URL or "https://api.openai.com/v1"}
+
+
+def log(text: str) -> None:
+    """Короткое сообщение в консоль сервера: видно, что происходит с запросами к модели."""
+    print(f"[LLM {time.strftime('%H:%M:%S')}] {text}", file=sys.stderr, flush=True)
+
+
+def _retry_in_text(msg: str) -> float | None:
+    """Gemini пишет паузу в теле: «retry in 35.2s» или "retryDelay": "35s"."""
+    m = re.search(r"retry in ([\d.]+)\s*s", msg) or re.search(r'retrydelay"?\s*:\s*"?([\d.]+)s', msg)
+    return min(90.0, float(m.group(1)) + 1) if m else None
 
 
 def _retry_after(e: Exception) -> float | None:
@@ -154,21 +168,28 @@ async def _complete_openai(system: str, user: str, schema: dict, name: str, mode
             if not hit:
                 raise RuntimeError(f"Провайдер отклонил запрос (400): {msg[:400]}") from e
             _unsupported.update(hit)
+            log(f"провайдер не принял параметры {sorted(hit)} — повторяю без них")
             attempt -= 1  # снятие параметра не тратит попытку
         except RateLimitError as e:
-            msg = str(e).lower()
+            # Gemini и др. кладут причину в тело ответа, а не в текст исключения.
+            msg = (str(e) + " " + json.dumps(getattr(e, "body", None), ensure_ascii=False, default=str)).lower()
             # Закончились кредиты (OpenAI) — повторять бессмысленно, сразу понятная ошибка.
             if any(s in msg for s in ("insufficient_quota", "no credits", "credit_balance")) or (
                     not config.LLM_BASE_URL and "exceeded your current quota" in msg):
                 raise RuntimeError("На ключе закончились кредиты — пополните баланс или смените провайдера в .env") from e
-            # Дневной лимит бесплатного тарифа (Gemini/Groq/OpenRouter) — до завтра не пройдёт.
+            # Модель недоступна на бесплатном тарифе (лимит 0).
+            if re.search(r"limit:\s*0\b", msg):
+                raise RuntimeError(f"Модель {model} недоступна на бесплатном тарифе (лимит 0) — "
+                                   f"укажите другую в CQA_MODEL. {msg[:300]}") from e
+            # Дневной лимит бесплатного тарифа — до завтра не пройдёт.
             if any(s in msg for s in ("per day", "perday", "requests per day", "tokens per day", "free-models-per-day")):
-                raise RuntimeError(f"Исчерпан дневной лимит бесплатного тарифа: {str(e)[:200]}") from e
-            # Поминутный лимит: ждём, сколько просит сервер (или нарастающую паузу), и повторяем.
+                raise RuntimeError(f"Исчерпан дневной лимит бесплатного тарифа для {model}: {msg[:300]}") from e
+            # Поминутный лимит: ждём, сколько просит сервер, и повторяем.
             rate_waits += 1
             if rate_waits > config.LLM_RATE_RETRIES:
-                raise RuntimeError(f"Лимит запросов провайдера не освободился: {str(e)[:200]}") from e
-            wait = _retry_after(e) or min(60.0, 5.0 * rate_waits)
+                raise RuntimeError(f"Лимит запросов провайдера не освободился: {msg[:300]}") from e
+            wait = _retry_after(e) or _retry_in_text(msg) or min(30.0, 5.0 * rate_waits)
+            log(f"лимит запросов {model}: жду {wait:.0f} с (повтор {rate_waits}/{config.LLM_RATE_RETRIES})")
             last_err = e
             await asyncio.sleep(wait)
             attempt -= 1  # ожидание лимита не тратит попытки на исправление параметров
