@@ -23,7 +23,8 @@ _unsupported: set[str] = set()
 def client() -> AsyncOpenAI:
     global _client
     if _client is None:
-        _client = AsyncOpenAI(api_key=config.LLM_API_KEY or "local", base_url=config.LLM_BASE_URL, max_retries=3)
+        _client = AsyncOpenAI(api_key=config.LLM_API_KEY or "local", base_url=config.LLM_BASE_URL, max_retries=3,
+                              timeout=config.LLM_TIMEOUT)
     return _client
 
 
