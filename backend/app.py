@@ -42,12 +42,19 @@ class FetchReq(BaseModel):
 
 @app.post("/api/datasets/fetch")
 async def fetch_dataset(req: FetchReq):
+    gid = req.group_id.strip()
+    source = "api"
     try:
-        ds, records = await dataset.fetch_group(req.group_id.strip())
+        ds, records = await dataset.fetch_group(gid)
     except Exception as e:  # noqa: BLE001
-        raise HTTPException(502, f"Не удалось получить набор: {e}")
+        # DEV есть в репозитории (data/dev.json): если API организаторов недоступен, берём его оттуда.
+        local = config.ROOT / "data" / "dev.json"
+        if gid.upper() != "DEV" or not local.exists():
+            raise HTTPException(502, f"Не удалось получить набор «{gid}» из API организаторов: {e}")
+        ds, records = dataset.parse_payload(json.loads(local.read_text(encoding="utf-8-sig")))
+        ds, source = ds or "DEV", "file"
     n = db.upsert_conversations(records, ds)
-    return {"dataset": ds, "loaded": n}
+    return {"dataset": ds, "loaded": n, "source": source}
 
 
 @app.post("/api/datasets/upload")
