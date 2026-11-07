@@ -110,6 +110,8 @@ async def _complete_openai(system: str, user: str, schema: dict, name: str, mode
     attempt = 0
     if config.LLM_BASE_URL and "api.openai.com" not in config.LLM_BASE_URL:
         _unsupported.update({"prompt_cache_breakpoint", "prompt_cache_key"})
+        if "generativelanguage.googleapis.com" in config.LLM_BASE_URL:
+            _unsupported.add("seed")  # Gemini не принимает seed — не тратим запрос на пробу
     while attempt < 4:
         attempt += 1
         kwargs: dict = {
