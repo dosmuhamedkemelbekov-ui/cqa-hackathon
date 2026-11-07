@@ -4,7 +4,7 @@ import json
 import uuid
 from typing import Any
 
-from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -17,6 +17,7 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 db.init()
 
 JOBS: dict[str, dict] = {}
+_TASKS: set = set()  # ссылки на фоновые задачи, чтобы их не собрал сборщик мусора
 
 
 # ---------------- служебное ----------------
@@ -336,12 +337,14 @@ async def _run_job(job_id: str, conv_ids: list[str], cl: dict, samples: int | No
         async with sem:
             await one(cid)
 
-    await asyncio.gather(*[limited(c) for c in conv_ids])
-    job["status"] = "finished"
+    try:
+        await asyncio.gather(*[limited(c) for c in conv_ids])
+    finally:
+        job["status"] = "finished"
 
 
 @app.post("/api/evaluate")
-async def evaluate_batch(req: EvalReq, background: BackgroundTasks):
+async def evaluate_batch(req: EvalReq):
     if not llm.is_configured():
         raise HTTPException(400, "LLM не настроена: задайте OPENAI_API_KEY (или OPENAI_BASE_URL) в .env")
     cl = _checklist_for(req.checklist_id)
@@ -355,7 +358,10 @@ async def evaluate_batch(req: EvalReq, background: BackgroundTasks):
     job_id = uuid.uuid4().hex[:8]
     JOBS[job_id] = {"id": job_id, "status": "running", "total": len(ids), "done": 0, "failed": [], "cost_usd": 0.0,
                     "llm_calls": 0, "results": [], "checklist": f"{cl['name']} v{cl['version']}"}
-    background.add_task(_run_job, job_id, ids, cl, req.samples, req.reuse)
+    # Отдельная задача в цикле событий: ответ уходит сразу, опрос /api/jobs не ждёт окончания оценки.
+    task = asyncio.create_task(_run_job(job_id, ids, cl, req.samples, req.reuse))
+    _TASKS.add(task)
+    task.add_done_callback(_TASKS.discard)
     return JOBS[job_id]
 
 
