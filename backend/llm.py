@@ -79,18 +79,20 @@ async def complete_json(system: str, user: str, schema: dict, name: str, model: 
             text = resp.choices[0].message.content or ""
             return json.loads(text), _usage(resp)
         except BadRequestError as e:
+            # Параметр, который модель не принимает, запоминаем и повторяем без него.
+            # Проверяем по тому, что было отправлено в ЭТОМ запросе: параллельные вызовы
+            # могли уже пометить параметр, но им тоже нужен повтор.
             msg = str(e).lower()
-            changed = False
-            for param in ("temperature", "seed"):
-                if param in msg and param not in _unsupported:
-                    _unsupported.add(param)
-                    changed = True
-            if ("json_schema" in msg or "response_format" in msg) and "json_schema" not in _unsupported:
-                _unsupported.add("json_schema")
-                changed = True
+            sent = {p for p in ("temperature", "seed") if p in kwargs}
+            if kwargs["response_format"]["type"] == "json_schema":
+                sent.add("json_schema")
+            hit = {p for p in ("temperature", "seed") if p in msg and p in sent}
+            if "json_schema" in sent and ("json_schema" in msg or "response_format" in msg):
+                hit.add("json_schema")
             last_err = e
-            if not changed:
+            if not hit:
                 raise
+            _unsupported.update(hit)
         except (RateLimitError, APIConnectionError) as e:
             last_err = e
             await asyncio.sleep(2 * (attempt + 1))

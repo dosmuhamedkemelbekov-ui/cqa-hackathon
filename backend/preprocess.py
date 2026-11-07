@@ -153,8 +153,15 @@ def facts_text(facts: dict) -> str:
         f"- Реплик оператора: {facts['operator_messages']}. Первая реплика оператора: {facts['first_operator_message'] or 'нет'}. "
         f"Последняя: {facts['last_operator_message'] or 'нет'}.",
         f"- Передача диалога оператору (системное событие): {facts['escalation_message'] or 'не найдено'}.",
-        f"- Системное подтверждение личности клиента: {', '.join(facts['identity_verified_messages']) or 'нет'}.",
     ]
+    if facts["identity_verified_messages"]:
+        lines.append(f"- Системное подтверждение личности клиента: {', '.join(facts['identity_verified_messages'])}.")
+    elif facts["channel"] == "звонок":
+        lines.append("- Системного сообщения о верификации нет: в звонках идентификация проходит голосом "
+                     "(клиент называет ФИО/данные/SMS-код, оператор подтверждает «всё верно», «идентификация пройдена»). "
+                     "Оценивай по репликам; скрытые маской данные означают, что клиент их назвал.")
+    else:
+        lines.append("- Системного подтверждения личности в чате нет (проверь, не подтверждена ли личность в репликах).")
     if facts["end_event"]:
         lines.append(f"- Событие завершения: {facts['end_event']['id']} «{facts['end_event']['text']}».")
     else:
