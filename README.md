@@ -114,4 +114,4 @@ python scripts/accuracy.py --sure      # только бесспорные от�
 | POST | `/api/appeals` · `/api/appeals/{id}/decision` | подать апелляцию / принять решение |
 | GET | `/api/export` | выгрузка результатов (внутренний формат) |
 | GET | `/api/results?dataset=DEV&use=ai` | results.json в формате организаторов (JSON 1.0) |
-| POST | `/api/results/save?dataset=DEV` | записать `results/dev|prod/results.json` и проверить формат |
+| POST | `/api/results/save?dataset=DEV` | записать `results/dev/…` или `results/prod/…` и проверить формат |

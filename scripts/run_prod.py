@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from backend import config, dataset, db, evaluator, llm, results_export  # noqa: E402
 
 
-async def evaluate_all(ids: list[str], cl: dict) -> list[str]:
+async def evaluate_all(ids: list[str], cl: dict, reasons: dict[str, str]) -> list[str]:
     precedents = db.get_setting("precedents", [])
     sem = asyncio.Semaphore(config.DIALOG_CONCURRENCY)
     failed: list[str] = []
@@ -40,6 +40,7 @@ async def evaluate_all(ids: list[str], cl: dict) -> list[str]:
                       f"{int(time.time() - t0)} с", flush=True)
             except Exception as e:  # noqa: BLE001
                 failed.append(cid)
+                reasons[cid] = str(e)
                 print(f"  ✘ {cid}: {e}", flush=True)
 
     await asyncio.gather(*[one(c) for c in ids])
@@ -78,17 +79,19 @@ def main() -> int:
 
     cl = db.active_checklist()
     print(f"2/4 Оценка: модель {config.LLM_MODEL}, чек-лист «{cl['name']}» v{cl['version']}", flush=True)
-    failed = asyncio.run(evaluate_all(ids, cl))
+    reasons: dict[str, str] = {}
+    failed = asyncio.run(evaluate_all(ids, cl, reasons))
     for attempt in (1, 2):
         if not failed:
             break
         print(f"    повтор {attempt} для {len(failed)} диалогов", flush=True)
-        failed = asyncio.run(evaluate_all(failed, cl))
+        failed = asyncio.run(evaluate_all(failed, cl, reasons))
 
     print("3/4 Выгрузка и проверка формата…", flush=True)
     out = config.ROOT / "results" / args.folder / "results.json"
     convs = [db.get_conversation(i) for i in ids]
-    doc = results_export.build(convs, db.latest_evaluations_map(), args.team, "ai")
+    doc = results_export.build(convs, db.latest_evaluations_map(), args.team, "ai",
+                               {c: reasons[c] for c in failed})
     results_export.write(doc, out)
     warnings: list[str] = []
     errs = results_export.validate(doc, ids, args.expect, warnings)

@@ -67,7 +67,7 @@ def model_info() -> dict:
     return {"mode": mode, "name": os.getenv("CQA_MODEL_NAME") or config.LLM_MODEL}
 
 
-def conversation_result(conv: dict, ev: dict | None, use: str = "ai") -> dict:
+def conversation_result(conv: dict, ev: dict | None, use: str = "ai", fail_reason: str | None = None) -> dict:
     """use='ai' — исходные ответы ИИ; 'final' — с учётом решений супервизора по апелляциям."""
     cid = conv["conversation_id"]
 
@@ -75,7 +75,7 @@ def conversation_result(conv: dict, ev: dict | None, use: str = "ai") -> dict:
         return {"conversation_id": cid, "status": "error", "criteria": [], "score": None, "error": msg}
 
     if not ev:
-        return error("Диалог не оценён системой.")
+        return error(f"Не удалось оценить диалог: {fail_reason[:300]}" if fail_reason else "Диалог не оценён системой.")
     cl = ev["checklist_snapshot"]
     answers = ev["original_answers"] if use == "ai" else ev["final_answers"]
     items = {i["criterion_id"]: i for i in ev["criteria"]}
@@ -110,12 +110,14 @@ def conversation_result(conv: dict, ev: dict | None, use: str = "ai") -> dict:
     }
 
 
-def build(conversations: list[dict], latest: dict[str, dict], team_name: str, use: str = "ai") -> dict:
+def build(conversations: list[dict], latest: dict[str, dict], team_name: str, use: str = "ai",
+          failures: dict[str, str] | None = None) -> dict:
     return {
         "schema_version": SCHEMA_VERSION,
         "team_name": team_name,
         "model": model_info(),
-        "results": [conversation_result(c, latest.get(c["conversation_id"]), use) for c in conversations],
+        "results": [conversation_result(c, latest.get(c["conversation_id"]), use, (failures or {}).get(c["conversation_id"]))
+                    for c in conversations],
     }
 
 
