@@ -57,10 +57,12 @@ def criterion_prompt(c: dict) -> str:
         lines.append("N/A для этого критерия не допускается.")
     if c.get("guidance"):
         lines.append(f"Уточнения к оценке: {c['guidance']}")
+    lines.append("Допустимые значения answer для ЭТОГО критерия (только они): "
+                 + ", ".join(f'"{a}"' for a in scoring.allowed_answers(c)) + ".")
     return "\n".join(lines)
 
 
-def response_schema(c: dict) -> dict:
+def response_schema(answers: list[str]) -> dict:
     return {
         "type": "object",
         "additionalProperties": False,
@@ -86,7 +88,7 @@ def response_schema(c: dict) -> dict:
                 "properties": {"from_msg": {"type": "string"}, "to_msg": {"type": "string"}},
             },
             "analysis": {"type": "string"},
-            "answer": {"type": "string", "enum": scoring.allowed_answers(c)},
+            "answer": {"type": "string", "enum": answers},
             "confidence": {"type": "string", "enum": ["high", "medium", "low"]},
             "rationale": {"type": "string"},
         },
@@ -103,20 +105,43 @@ def _vote(c: dict, answers: list[str]) -> str:
     return Counter(answers).most_common(1)[0][0]
 
 
-async def evaluate_criterion(c: dict, prepared: dict, samples: int = 1) -> dict:
-    user = (
+def checklist_schema(checklist: dict) -> dict:
+    """Одна схема на весь чек-лист: схема входит в начало промпта, и если она одинакова для всех
+    критериев, общий префикс кэшируется. Допустимость ответа для конкретного критерия проверяется в коде."""
+    vals: list[str] = []
+    for c in checklist["criteria"]:
+        for a in scoring.allowed_answers(c):
+            if a not in vals:
+                vals.append(a)
+    return response_schema(vals)
+
+
+async def evaluate_criterion(c: dict, prepared: dict, samples: int = 1, cache_key: str | None = None,
+                             schema: dict | None = None) -> dict:
+    # Общая для всех критериев часть — отдельно: на её конце ставится точка кэша.
+    prefix = (
         "ТРАНСКРИПТ (формат: [id | время | роль] текст):\n"
         + prepared["transcript_text"]
         + "\n\nФАКТЫ:\n"
         + preprocess.facts_text(prepared["facts"])
         + "\n\n"
-        + criterion_prompt(c)
     )
-    schema = response_schema(c)
-    runs = await asyncio.gather(
-        *[llm.complete_json(SYSTEM_PROMPT, user, schema, name=f"criterion_{c['id']}") for _ in range(samples)],
-        return_exceptions=True,
-    )
+    user = criterion_prompt(c)
+    schema = schema or response_schema(scoring.allowed_answers(c))
+    allowed = set(scoring.allowed_answers(c))
+
+    async def call():
+        return await llm.complete_json(SYSTEM_PROMPT, user, schema, name="criterion_evaluation",
+                                       cache_key=cache_key, user_prefix=prefix)
+
+    runs = await asyncio.gather(*[call() for _ in range(samples)], return_exceptions=True)
+    # Ответ вне допустимых для этого критерия (схема общая) — один повтор.
+    for idx, r in enumerate(runs):
+        if not isinstance(r, Exception) and r[0].get("answer") not in allowed:
+            try:
+                runs[idx] = await call()
+            except Exception as e:  # noqa: BLE001
+                runs[idx] = e
     ok = [r for r in runs if not isinstance(r, Exception)]
     usage = {"input": 0, "cached": 0, "output": 0}
     for _, u in ok:
@@ -125,7 +150,6 @@ async def evaluate_criterion(c: dict, prepared: dict, samples: int = 1) -> dict:
     if not ok:
         return {"criterion_id": c["id"], "answer": None, "error": str(runs[0]), "usage": usage}
 
-    allowed = set(scoring.allowed_answers(c))
     answers = [r["answer"] for r, _ in ok if r.get("answer") in allowed]
     if not answers:
         return {"criterion_id": c["id"], "answer": None, "error": "Модель вернула недопустимый ответ", "usage": usage}
@@ -225,7 +249,14 @@ async def evaluate(conv: dict, checklist: dict, samples: int | None = None, prev
                     "usage": {"input": 0, "cached": 0, "output": 0},
                 }
     todo = [c for c in checklist["criteria"] if c["id"] not in reused]
-    results = await asyncio.gather(*[evaluate_criterion(c, prepared, samples) for c in todo])
+    # Прогрев кэша: общий префикс (системный промпт + транскрипт + факты) одинаков для всех критериев.
+    # Первый вызов идёт один и кладёт префикс в кэш, остальные параллельно читают его — дешевле и быстрее.
+    key = f"cqa-{conv['conversation_id']}"
+    schema = checklist_schema(checklist)
+    results = []
+    if todo:
+        results.append(await evaluate_criterion(todo[0], prepared, samples, key, schema))
+        results += await asyncio.gather(*[evaluate_criterion(c, prepared, samples, key, schema) for c in todo[1:]])
     crit_results = {r["criterion_id"]: r for r in results} | reused
     usage = {"input": 0, "cached": 0, "output": 0}
     for r in results:

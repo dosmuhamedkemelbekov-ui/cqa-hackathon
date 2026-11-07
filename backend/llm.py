@@ -50,7 +50,10 @@ def cost_usd(usage: dict) -> float:
     ) / 1_000_000
 
 
-async def complete_json(system: str, user: str, schema: dict, name: str, model: str | None = None) -> tuple[dict, dict]:
+async def complete_json(system: str, user: str, schema: dict, name: str, model: str | None = None,
+                        cache_key: str | None = None, user_prefix: str | None = None) -> tuple[dict, dict]:
+    """user_prefix — общая часть (транскрипт + факты) для всех критериев диалога. Для gpt-5.6+ на её конце
+    ставится явная точка кэша: остальные критерии читают префикс из кэша, а не обрабатывают заново."""
     """Возвращает (распарсенный JSON, usage). Строгая JSON Schema; при отказе модели — json_object."""
     model = model or config.LLM_MODEL
     last_err: Exception | None = None
@@ -59,10 +62,21 @@ async def complete_json(system: str, user: str, schema: dict, name: str, model: 
             "model": model,
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
         }
+        if user_prefix is not None:
+            if "prompt_cache_breakpoint" not in _unsupported:
+                kwargs["messages"][1]["content"] = [
+                    {"type": "text", "text": user_prefix, "prompt_cache_breakpoint": {"mode": "explicit"}},
+                    {"type": "text", "text": user},
+                ]
+            else:
+                kwargs["messages"][1]["content"] = user_prefix + user
         if "temperature" not in _unsupported:
             kwargs["temperature"] = 0
         if "seed" not in _unsupported:
             kwargs["seed"] = 7
+        # Один ключ на диалог: запросы по всем критериям попадают на один кэш промпта.
+        if cache_key and "prompt_cache_key" not in _unsupported:
+            kwargs["prompt_cache_key"] = cache_key
         if "json_schema" not in _unsupported:
             kwargs["response_format"] = {
                 "type": "json_schema",
@@ -83,10 +97,13 @@ async def complete_json(system: str, user: str, schema: dict, name: str, model: 
             # Проверяем по тому, что было отправлено в ЭТОМ запросе: параллельные вызовы
             # могли уже пометить параметр, но им тоже нужен повтор.
             msg = str(e).lower()
-            sent = {p for p in ("temperature", "seed") if p in kwargs}
+            sent = {p for p in ("temperature", "seed", "prompt_cache_key") if p in kwargs}
+            if isinstance(kwargs["messages"][1]["content"], list):
+                sent.add("prompt_cache_breakpoint")
             if kwargs["response_format"]["type"] == "json_schema":
                 sent.add("json_schema")
-            hit = {p for p in ("temperature", "seed") if p in msg and p in sent}
+            hit = {p for p in ("temperature", "seed", "prompt_cache_key", "prompt_cache_breakpoint")
+                   if p in msg and p in sent}
             if "json_schema" in sent and ("json_schema" in msg or "response_format" in msg):
                 hit.add("json_schema")
             last_err = e
