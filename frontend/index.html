@@ -779,7 +779,8 @@ function renderListActions(){
   const missing=list.filter(d=>!d.evaluation||d.evaluation.stale).length;
   let html='<button class="btn sm primary" id="btnEvalMissing"'+(missing&&!state.job?'':' disabled')+' title="Оценить диалоги без оценки или оценённые старой версией чек-листа">Оценить ИИ: '+missing+'</button>'+
     '<button class="btn sm" id="btnEvalAll"'+(list.length&&!state.job?'':' disabled')+' title="Заново прогнать ИИ по всем показанным диалогам">Переоценить все ('+list.length+')</button>'+
-    '<a class="btn sm" style="line-height:24px;text-decoration:none" href="'+API+'/export'+(state.filters.dataset!=='all'?'?dataset='+encodeURIComponent(state.filters.dataset):'')+'" target="_blank">Экспорт</a>';
+    '<a class="btn sm" style="line-height:24px;text-decoration:none" href="'+API+'/results'+(state.filters.dataset!=='all'?'?dataset='+encodeURIComponent(state.filters.dataset):'')+'" target="_blank" title="Файл results.json в формате организаторов (JSON 1.0): по одной записи на диалог набора">results.json</a>'+
+    (state.filters.dataset!=='all'?'<button class="btn sm" id="btnSaveResults" title="Записать results/'+(state.filters.dataset.toUpperCase()==='DEV'?'dev':'prod')+'/results.json в репозиторий и проверить формат">Сохранить в results/'+(state.filters.dataset.toUpperCase()==='DEV'?'dev':'prod')+'</button>':'');
   if(state.job){
     const j=state.job;
     html+='<div class="prog"><span class="spin"></span><span>'+j.done+' / '+j.total+' · вызовов ИИ '+j.llm_calls+' · $'+j.cost_usd.toFixed(3)+'</span><div class="bar"><div style="width:'+(j.total?j.done/j.total*100:0)+'%"></div></div></div>';
@@ -1138,6 +1139,7 @@ function renderSettings(){
         (c.type==='scale'?'<label class="full">Описание ступеней шкалы (по строке: «значение — описание»)<textarea class="in-steps" rows="5">'+esc((c.scale||[]).map(s=>s.value+' — '+(s.label||'')).join('\n'))+'</textarea></label>':'')+
         '<label>Секция<select class="in-sec">'+secs.map(s=>'<option value="'+esc(s.id)+'"'+(s.id===c.section?' selected':'')+'>'+esc(s.name)+'</option>').join('')+'</select></label>'+
         '<label>ID критерия<textarea class="in-id" style="min-height:30px" rows="1"'+(c._isNew?'':' disabled')+'>'+esc(c.id)+'</textarea></label>'+
+        '<label>Код в выгрузке results.json<input type="text" class="in-code" value="'+esc(c.code||'')+'" placeholder="напр. closure — код заменяемого критерия"></label>'+
       '</div></td></tr>';
     }
     return row;
@@ -1639,6 +1641,16 @@ function bind(){
       if(!confirm('Заново прогнать ИИ по '+list.length+' диалогам? Неизменённые критерии будут взяты из прошлых оценок.'))return;
       startJob(list.map(d=>d.conversation_id)).catch(err=>toast(err.message,'err'));
     }
+    const sv=e.target.closest('#btnSaveResults');
+    if(sv){
+      const ds=state.filters.dataset;busy(sv,true,'Сохраняю…');
+      api('/results/save?dataset='+encodeURIComponent(ds),{method:'POST'}).then(r=>{
+        busy(sv,false);
+        const msg=r.path+': записей '+r.total+', ok '+r.ok+(r.errors_count?', error '+r.errors_count:'');
+        if(r.problems.length)toast('Формат: '+r.problems.slice(0,3).join('; '),'err',9000);
+        else toast('✓ '+msg+'. Осталось сделать git commit и push','ok',7000);
+      }).catch(err=>{busy(sv,false);toast(err.message,'err');});
+    }
   });
   const pick=e=>{const li=e.target.closest('.li');if(li)selectDialog(li.dataset.id,true);};
   $('#dlgList').addEventListener('click',pick);
@@ -1759,6 +1771,7 @@ function bind(){
     else if(t.contains('in-rule'))c.rule=e.target.value;
     else if(t.contains('in-nacond'))c.na_condition=e.target.value;
     else if(t.contains('in-guide'))c.guidance=e.target.value;
+    else if(t.contains('in-code')){const v=e.target.value.trim();if(v)c.code=v;else delete c.code;}
     else if(t.contains('in-id')){const v=e.target.value.trim();$$('tr[data-id="'+CSS.escape(c.id)+'"]',sb).forEach(tr=>tr.dataset.id=v);c.id=v;}
     else if(t.contains('in-scale')){
       const p=parseScale(e.target.value);c._scaleRaw=e.target.value;c._scaleBad=!p;
