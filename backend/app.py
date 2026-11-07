@@ -531,6 +531,31 @@ def review(ev_id: int, req: ReviewReq):
     return _apply_review(ev, req.criterion_id, req.new_answer, req.reason, req.reviewer)
 
 
+# ---------------- грубые ошибки: все диалоги с флагом и объяснением ----------------
+@app.get("/api/gross")
+def gross(dataset: str | None = None):
+    latest = db.latest_evaluations_map()
+    rows = []
+    for c in db.list_conversations(dataset):
+        ev = latest.get(c["conversation_id"])
+        if not ev or not ev["final_score"].get("gross_error"):
+            continue
+        flag = next((x for x in ev["checklist_snapshot"]["criteria"] if x["type"] == "flag"), None)
+        if not flag:
+            continue
+        item = next((i for i in ev["criteria"] if i["criterion_id"] == flag["id"]), {})
+        dec = [d for d in ev.get("decisions", []) if d["criterion_id"] == flag["id"]]
+        by_sup = bool(dec and dec[-1]["to"] == "yes" and ev["original_answers"].get(flag["id"]) != "yes")
+        rows.append({
+            "conversation_id": c["conversation_id"], "language": c.get("language"), "channel": c.get("channel"),
+            "total": ev["final_score"]["total"], "criterion_id": flag["id"],
+            "rationale": dec[-1]["reason"] if by_sup else item.get("rationale", ""),
+            "evidence": [{"msg_id": e.get("msg_id"), "quote": e.get("quote", "")} for e in item.get("evidence") or []],
+            "by_supervisor": by_sup,
+        })
+    return rows
+
+
 # ---------------- экспорт ----------------
 @app.get("/api/export")
 def export(dataset: str | None = None):
