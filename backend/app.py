@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import config, dataset, db, evaluator, llm, preprocess, scoring
+from . import config, dataset, db, evaluator, intake, llm, preprocess, scoring
 
 app = FastAPI(title="CQA — Conversation Quality Analytics")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -28,6 +28,8 @@ def health():
         "model": config.LLM_MODEL,
         "base_url": config.LLM_BASE_URL or "https://api.openai.com/v1",
         "samples": config.LLM_SAMPLES,
+        "stt_configured": intake.stt_configured(),
+        "stt_model": config.STT_MODEL,
         "verify": config.LLM_VERIFY,
         "precedents": len(db.get_setting("precedents", [])),
     }
@@ -125,11 +127,81 @@ async def audio(conv_id: str):
     conv = db.get_conversation(conv_id)
     if not conv or not conv.get("audio_url"):
         raise HTTPException(404, "У диалога нет записи")
+    local = intake.upload_path(conv["audio_url"])
+    if local:
+        return FileResponse(local)
+    if conv["audio_url"].startswith(intake.UPLOAD_PREFIX):
+        raise HTTPException(404, "Файл записи не найден на сервере")
     try:
         url = await dataset.resolve_audio(conv["audio_url"])
     except Exception as e:  # noqa: BLE001
         raise HTTPException(502, f"Не удалось получить запись: {e}")
     return RedirectResponse(url, status_code=302)
+
+
+# ---------------- новый диалог: текст или аудио ----------------
+MANUAL_DATASET = "MANUAL"
+
+
+class NewConvReq(BaseModel):
+    conversation_id: str
+    channel: str = "chat"  # chat | call
+    language: str = "RU"
+    transcript: list[dict]
+    audio_file: str | None = None  # имя файла из /api/transcribe
+    replace: bool = False
+
+
+@app.post("/api/conversations")
+def create_conversation(req: NewConvReq):
+    if not req.replace and db.get_conversation(req.conversation_id):
+        raise HTTPException(409, f"Диалог с ID «{req.conversation_id}» уже есть")
+    try:
+        rec = intake.make_record(req.conversation_id, req.channel, req.language, req.transcript, req.audio_file)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    db.upsert_conversations([rec], MANUAL_DATASET)
+    return {"conversation_id": rec["conversation_id"], "dataset": MANUAL_DATASET, "messages": len(rec["transcript"])}
+
+
+@app.post("/api/transcribe")
+async def transcribe(file: UploadFile = File(...), language: str = "AUTO", operator: str | None = None):
+    """Аудио → Whisper → роли говорящих (LLM). Возвращает транскрипт для проверки и имя сохранённого файла."""
+    if not intake.stt_configured():
+        raise HTTPException(400, "Распознавание речи не настроено: задайте OPENAI_API_KEY (или CQA_STT_API_KEY) в .env")
+    try:
+        name = intake.save_upload(await file.read(), file.filename or "audio")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    path = intake.UPLOAD_DIR / name
+    language = (language or "AUTO").upper()
+    try:
+        stt = await intake.transcribe(path, language)
+    except Exception as e:  # noqa: BLE001
+        path.unlink(missing_ok=True)
+        raise HTTPException(502, f"Распознавание речи не удалось: {e}")
+    warnings = []
+    lang = language if language in intake.LANG_CODE else intake.LANG_FROM_WHISPER.get(stt["language"].lower())
+    if not lang:
+        lang = "RU"
+        warnings.append(f"Язык «{stt['language'] or 'не определён'}» не входит в RU/KZ/EN — установлен RU")
+    segs = stt["segments"]
+    roles_by = "llm"
+    try:
+        if not llm.is_configured():
+            raise RuntimeError("LLM не настроена")
+        labels, fixed = await intake.diarize(segs, lang, (operator or "").strip() or None)
+        if fixed:
+            warnings.append("Роли части реплик определены по чередованию — проверьте разметку")
+    except Exception as e:  # noqa: BLE001
+        labels, roles_by = intake.heuristic_roles(segs), "heuristic"
+        warnings.append(f"Роли говорящих размечены по паузам, без ИИ ({e}) — проверьте operator/client")
+    transcript = intake.build_transcript(segs, labels)
+    roles_ok = any(t["speaker"] == "operator" for t in transcript) and any(t["speaker"] == "client" for t in transcript)
+    if not roles_ok:
+        warnings.append("Не удалось выделить обе роли (operator и client) — исправьте разметку вручную")
+    return {"audio_file": name, "language": lang, "duration": round(stt["duration"], 1), "transcript": transcript,
+            "roles_by": roles_by, "roles_ok": roles_ok, "warnings": warnings}
 
 
 # ---------------- чек-листы ----------------

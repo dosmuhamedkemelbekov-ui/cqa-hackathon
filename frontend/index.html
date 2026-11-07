@@ -363,6 +363,43 @@ details.reason p{white-space:pre-wrap;font-size:12px;color:var(--n80);margin:6px
 table.t .typecell select{width:130px}
 table.t .typecell input.in-scale{width:130px}
 table.t td:nth-child(2){min-width:280px}
+
+/* ---------- новый диалог: текст или аудио ---------- */
+[hidden]{display:none!important}
+.new-dlg{padding:8px 12px 0;background:#fff}
+.new-dlg .btn{width:100%}
+.modal{position:relative}
+.modal .body{max-height:calc(100vh - 190px);overflow:auto}
+.modal.wide{max-width:880px}
+.form-grid{display:grid;grid-template-columns:1.4fr .8fr .6fr 1.2fr;gap:10px;margin-bottom:6px}
+.fld{display:block;font-size:12px;font-weight:600;margin-bottom:8px}
+.fld input,.fld select,.fld textarea{display:block;width:100%;margin-top:3px;border:1px solid var(--n60);border-radius:2px;padding:6px 8px;background:#fff;font-weight:400}
+.fld input,.fld select{height:32px}
+.fld textarea{min-height:230px;resize:vertical;font-family:Consolas,'SFMono-Regular',Menlo,monospace;font-size:12.5px;line-height:1.5}
+.fld input:focus,.fld select:focus,.fld textarea:focus{outline:2px solid var(--g500);outline-offset:-1px}
+.examples{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:2px 0 8px;font-size:12px;color:var(--n80)}
+.parse-info{font-size:12px;padding:6px 8px;border-radius:3px;background:var(--n20);color:var(--n80);line-height:1.5}
+.parse-info.ok{background:var(--ok-bg);color:var(--ok)}
+.parse-info.err{background:var(--err-bg);color:var(--err)}
+.parse-info.warn{background:var(--warn-bg);color:var(--warn)}
+.hint{font-size:12px;color:var(--n80);margin:2px 0 8px;line-height:1.5}
+.modeseg{display:inline-flex;border:1px solid var(--n60);border-radius:2px;overflow:hidden;margin:2px 0 10px}
+.modeseg button{background:#fff;border:0;padding:0 14px;height:32px;font-weight:600;font-size:13px;color:var(--n80)}
+.modeseg button+button{border-left:1px solid var(--n60)}
+.modeseg button.on{background:var(--g700);color:#fff}
+.drop{border:2px dashed var(--n60);border-radius:4px;background:var(--n10);padding:24px 12px;text-align:center;color:var(--n80);transition:.15s;margin-bottom:10px;cursor:pointer}
+.drop:hover,.drop:focus-visible{border-color:var(--g600);outline:none}
+.drop.over{border-color:var(--g600);background:var(--g50);color:var(--g800)}
+.drop .big{font-size:15px;font-weight:600;color:var(--n100);margin-bottom:6px}
+.fileinfo{border:1px solid var(--n40);border-radius:3px;padding:8px 10px;margin-bottom:10px;background:#fff}
+.fileinfo .fi-top{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px;font-size:13px}
+.fileinfo audio{width:100%;height:36px}
+.pipe{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--n80);margin:4px 0 8px}
+.pipe b{background:var(--g100);color:var(--g800);border-radius:10px;padding:2px 9px;font-weight:600}
+.carry{margin-bottom:8px;padding:6px 8px;border-radius:3px;background:var(--info-bg);color:var(--info);font-size:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.dlg-busy{position:absolute;inset:0;background:rgba(255,255,255,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-weight:600;color:var(--g800);z-index:3;border-radius:4px;text-align:center;padding:16px}
+.dlg-busy .spin{width:40px;height:40px;border-width:4px}
+@media (max-width:760px){.form-grid{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
@@ -395,6 +432,7 @@ table.t td:nth-child(2){min-width:280px}
 <main id="viewDialogs" class="view active">
   <div class="grid">
     <section class="col" id="colList" aria-label="Список диалогов">
+      <div class="new-dlg"><button class="btn primary" id="btnNewDlg" type="button">+ Новый диалог (текст или аудио)</button></div>
       <div class="filters" id="filters"></div>
       <div class="list-actions" id="listActions"></div>
       <div class="list-meta" id="listMeta"></div>
@@ -474,6 +512,65 @@ table.t td:nth-child(2){min-width:280px}
     </footer>
   </div>
 </div>
+<!-- new dialog modal: текстовый транскрипт или аудиозапись -->
+<div class="modal-back" id="dlgModal" role="dialog" aria-modal="true" aria-labelledby="dTitle">
+  <div class="modal wide">
+    <header id="dTitle">Новый диалог — проверка с помощью ИИ</header>
+    <div class="body">
+      <div class="form-grid">
+        <label class="fld">ID диалога<input id="dId" type="text" autocomplete="off" spellcheck="false"></label>
+        <label class="fld">Канал<select id="dChannel"><option value="chat">Чат</option><option value="call">Звонок</option></select></label>
+        <label class="fld" id="fldLang">Язык<select id="dLang"><option>RU</option><option>KZ</option><option>EN</option></select></label>
+        <label class="fld" id="fldOp">Имя оператора (подсказка для ролей)<input id="dOp" type="text" autocomplete="off" placeholder="необязательно"></label>
+      </div>
+      <div class="modeseg" id="dMode" role="tablist" aria-label="Формат ввода">
+        <button type="button" class="on" data-mode="text">Текстовый транскрипт</button>
+        <button type="button" data-mode="audio">Загрузить аудиофайл 🎙️</button>
+      </div>
+      <div id="textPane">
+        <div class="carry" id="dCarry" hidden>🎙️ <span id="dCarryText"></span><button class="linkbtn" type="button" id="dCarryDrop">Не прикреплять запись</button></div>
+        <div class="examples"><span>Вставить пример:</span>
+          <button class="btn sm" type="button" data-ex="RU">RU · чат</button>
+          <button class="btn sm" type="button" data-ex="KZ">KZ · чат</button>
+          <button class="btn sm" type="button" data-ex="EN">EN · звонок</button>
+        </div>
+        <label class="fld">Транскрипт — по одной реплике в строке: <code>MM:SS спикер: текст</code> (спикеры: operator, client, bot, system)
+          <textarea id="dText" spellcheck="false" placeholder="00:02 operator: Здравствуйте! Меня зовут Адиль, Freedom Broker. Чем могу помочь?&#10;00:15 client: Добрый день, хочу узнать про тарифы.&#10;00:30 operator: ..."></textarea>
+        </label>
+        <div class="parse-info" id="dParse">Вставьте транскрипт или выберите пример.</div>
+      </div>
+      <div id="audioPane" hidden>
+        <div class="pipe"><span>Сервер сделает всё сам:</span><b>1 · Распознавание речи (Whisper)</b>→<b>2 · Роли говорящих</b>→<b>3 · Оценка по чек-листу</b></div>
+        <div class="drop" id="dDrop" tabindex="0" role="button" aria-label="Выбрать или перетащить аудиофайл">
+          <div class="big">🎙️ Перетащите аудиофайл сюда</div>
+          <div><button class="btn sm primary" type="button" id="dPick">Выбрать файл</button></div>
+          <div class="hint" style="margin-top:8px">.mp3, .wav, .m4a, .ogg · до 25 МБ (лимит Whisper API)</div>
+          <input type="file" id="dFile" accept="audio/*,.mp3,.wav,.m4a,.ogg" hidden>
+        </div>
+        <div class="fileinfo" id="dFileInfo" hidden>
+          <div class="fi-top"><b id="fName"></b><span style="color:var(--n80)" id="fSize"></span><button class="linkbtn" type="button" id="fClear">Убрать файл</button></div>
+          <audio id="dPreview" controls preload="metadata"></audio>
+        </div>
+        <label class="fld" style="max-width:260px">Язык аудио
+          <select id="aLang"><option value="AUTO">Автоопределение</option><option value="RU">RU</option><option value="KZ">KZ</option><option value="EN">EN</option></select>
+        </label>
+        <label class="tgl" style="font-size:12px"><input type="checkbox" id="aReview"> Сначала показать транскрипт для проверки ролей, потом оценивать</label>
+        <div class="hint">Запись сохраняется на сервере и прикрепляется к диалогу как звонок — в карточке работает плеер с переходом к реплике. Для казахского речь распознаётся хуже — проверьте транскрипт.</div>
+      </div>
+    </div>
+    <footer>
+      <button class="btn" type="button" id="dCancel">Отмена</button>
+      <button class="btn" type="button" id="dSaveOnly" title="Добавить в список без оценки ИИ">Только добавить</button>
+      <button class="btn primary" type="button" id="dEval">Оценить с помощью ИИ</button>
+    </footer>
+    <div class="dlg-busy" id="dBusy" hidden>
+      <span class="spin"></span>
+      <div id="dBusyText">Обработка…</div>
+      <div id="dBusyStep" style="font-size:12px;font-weight:400;color:var(--n80)"></div>
+    </div>
+  </div>
+</div>
+
 <div id="toasts" aria-live="polite"></div>
 
 <script>
@@ -730,7 +827,9 @@ function renderTranscript(){
     html+='<div class="audio"><audio id="audioEl" controls preload="metadata" src="'+API+'/conversations/'+encodeURIComponent(d.conversation_id)+'/audio"></audio>'+
       '<div class="a-row"><button class="btn sm" id="aBack">⏪ −5 с</button><button class="btn sm primary" id="aPlay">▶ Воспроизвести</button><button class="btn sm" id="aFwd">+5 с ⏩</button>'+
       '<select id="aSpeed" aria-label="Скорость"><option value="1">1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="2">2×</option></select>'+
-      '<a class="src" href="'+esc(d.audio_page)+'" target="_blank" title="Плеер организаторов">Запись звонка · позиции реплик учитывают паузы записи</a></div></div>';
+      (String(d.audio_page||'').indexOf('upload:')===0
+        ?'<span class="src">Загруженная запись · роли размечены автоматически</span>'
+        :'<a class="src" href="'+esc(d.audio_page)+'" target="_blank" title="Плеер организаторов">Запись звонка · позиции реплик учитывают паузы записи</a>')+'</div></div>';
   }
   const marks=evidenceMarks(d);
   const nBot=d.messages.filter(m=>m.speaker==='bot').length;
@@ -1263,6 +1362,252 @@ async function sendAppeal(){
 }
 
 /* =====================================================================
+   НОВЫЙ ДИАЛОГ: текстовый транскрипт или аудио (Whisper → роли → оценка ИИ на сервере)
+===================================================================== */
+const nd={mode:'text',file:null,fileUrl:null,carry:null,busy:false};
+const SPEAKER_ALIAS={operator:'operator','оператор':'operator',agent:'operator','агент':'operator',op:'operator',client:'client','клиент':'client',customer:'client',user:'client',bot:'bot','бот':'bot',system:'system','система':'system',sys:'system'};
+const tsSec=ts=>{const p=ts.split(':').map(Number);return p.length===3?p[0]*3600+p[1]*60+p[2]:p[0]*60+p[1];};
+function normTs(raw){
+  const p=String(raw).trim().split(':').map(Number);
+  if(!p.length||p.some(n=>!Number.isFinite(n)||n<0))return null;
+  let m,s;
+  if(p.length===3){m=p[0]*60+p[1];s=p[2];}else if(p.length===2){m=p[0];s=p[1];}else return null;
+  if(s>59)return null;
+  return pad(m)+':'+pad(s);
+}
+function parseTranscript(text){
+  const out={messages:[],errors:[],warnings:[]},used=new Set();
+  const re=/^\s*[\[(]?(\d{1,3}:\d{2}(?::\d{2})?)[\])]?\s*[-–—]?\s*(\p{L}+)\s*[:：]\s*(.*)$/u;
+  let prevOk=false;
+  String(text||'').split(/\r?\n/).forEach((line,idx)=>{
+    if(!line.trim())return;
+    const m=line.match(re),n=idx+1;
+    if(!m){
+      if(prevOk&&out.messages.length)out.messages[out.messages.length-1].text+='\n'+line.trim();
+      else{out.errors.push('Строка '+n+': не распознан формат — нужно «MM:SS спикер: текст»');prevOk=false;}
+      return;
+    }
+    let ts=normTs(m[1]);const sp=SPEAKER_ALIAS[m[2].toLowerCase()],body=m[3].trim();
+    if(!ts){out.errors.push('Строка '+n+': некорректное время «'+m[1]+'»');prevOk=false;return;}
+    if(!sp){out.errors.push('Строка '+n+': неизвестный спикер «'+m[2]+'» (допустимо: operator, client, bot, system)');prevOk=false;return;}
+    if(!body){out.errors.push('Строка '+n+': пустая реплика');prevOk=false;return;}
+    const orig=ts;
+    while(used.has(ts)){const t=tsSec(ts)+1;ts=pad(Math.floor(t/60))+':'+pad(t%60);}
+    if(ts!==orig)out.warnings.push('Повтор времени '+orig+' — реплика сдвинута на '+ts);
+    used.add(ts);
+    out.messages.push({timestamp:ts,speaker:sp,text:body});
+    prevOk=true;
+  });
+  const sorted=out.messages.map((x,i)=>({x:x,i:i})).sort((a,b)=>tsSec(a.x.timestamp)-tsSec(b.x.timestamp)||a.i-b.i).map(o=>o.x);
+  if(sorted.some((x,i)=>x!==out.messages[i]))out.warnings.push('Реплики отсортированы по времени');
+  out.messages=sorted;
+  return out;
+}
+const EXAMPLES={
+  RU:{channel:'chat',lang:'RU',text:`00:00 system: Чат открыт · Канал: веб-чат
+00:03 bot: Здравствуйте! Я виртуальный помощник Freedom. Подключаю оператора.
+00:20 system: Оператор Адиль подключился к чату
+00:24 operator: Здравствуйте! Меня зовут Адиль, Freedom Broker. Чем могу помочь?
+00:41 client: Добрый день, хочу узнать про тарифы. И можно ли вывести деньги на карту другого банка?
+00:58 operator: Подскажите, пожалуйста, у вас уже есть открытый брокерский счёт или вы только планируете открыть?
+01:12 client: Счёт открыт, хочу понять, сколько стоит вывод.
+01:30 operator: Для ответа по вашему счёту мне нужно подтвердить личность. Назовите, пожалуйста, ФИО и кодовое слово.
+01:52 client: Сидоров Алексей Николаевич, кодовое слово «ромашка».
+02:05 operator: Спасибо, Алексей Николаевич, личность подтверждена.
+02:20 operator: Вывод на карту другого банка возможен, комиссия зависит от вашего тарифа. Актуальные ставки есть в разделе «Тарифы» личного кабинета, пришлю ссылку: freedom.example/tariffs
+02:50 client: Понятно, спасибо!
+03:02 operator: Рад был помочь, Алексей Николаевич! Если появятся вопросы — пишите. Хорошего дня!
+03:10 system: Чат закрыт оператором`},
+  KZ:{channel:'chat',lang:'KZ',text:`00:00 system: Чат ашылды · Арна: мобильді қосымша
+00:04 bot: Сәлеметсіз бе! Мен Freedom виртуалды көмекшісімін. Сізді оператормен байланыстырамын.
+00:20 system: Оператор Айгүл чатқа қосылды
+00:24 operator: Сәлеметсіз бе! Менің атым Айгүл, Freedom Broker компаниясы. Сізге қалай көмектесе аламын?
+00:41 client: Сәлем. Шотты толықтыру үшін қандай әдіс бар? Картамен толықтыруға бола ма?
+00:58 operator: Иә, банк картасымен толықтыруға болады. Жеке кабинетте «Шотты толықтыру» бөлімін таңдап, картаны көрсетіңіз. Қажет болса, банк аударымы арқылы да толықтыруға болады.
+01:25 client: Түсінікті, рахмет. Ал аударым қанша уақытқа дейін жүреді?
+01:40 operator: Сіздің сұрағыңызды түсінемін, мұны нақтылайын. Бір минут күте тұрыңыз, өтінемін.
+02:10 operator: Банк аударымы әдетте бір жұмыс күні ішінде түседі. Қосымша сұрақтарыңыз болса, жазыңыз.
+02:30 client: Рахмет, барлығы түсінікті.
+02:38 operator: Сізге көмектесе алғаныма қуаныштымын, Нұрлан! Сау болыңыз, жақсы күн тілеймін!
+02:45 system: Чат оператормен жабылды`},
+  EN:{channel:'call',lang:'EN',text:`00:00 system: Call started · Inbound
+00:04 operator: Good afternoon, Freedom Broker, this is Dana speaking. How may I help you?
+00:10 client: Hi, I can't log in to the mobile app, it keeps saying my password is wrong. I have an important trade to make today.
+00:22 operator: I'm sorry about the trouble, let's sort it out quickly. Which phone are you using, iPhone or Android?
+00:34 client: Android.
+00:40 operator: Thank you. For security, could you confirm your full name and the code word on the account?
+00:52 client: Michael Turner, the code word is maple.
+01:02 operator: Thank you, Mr. Turner, you're verified. I've sent a password reset link to your registered email. It's valid for one hour.
+01:20 client: Got it, I see the email.
+01:28 operator: Great. If the link doesn't work, call us back and we'll help right away. Is there anything else I can do for you?
+01:38 client: No, that's all. Thanks!
+01:42 operator: Thank you for calling Freedom Broker, Mr. Turner. Have a great day!
+01:46 system: Call ended`}
+};
+const AUDIO_EXT=['mp3','wav','m4a','ogg','oga','mp4','mpeg','mpga','webm','flac'];
+const MAX_AUDIO=25*1024*1024;
+const fmtSize=b=>b>=1048576?(b/1048576).toFixed(1)+' МБ':Math.max(1,Math.round(b/1024))+' КБ';
+
+function nextManualId(){
+  const ex=new Set(state.list.map(d=>d.conversation_id));
+  let n=1,id;
+  do{id='USER-TEST-'+String(n).padStart(3,'0');n++;}while(ex.has(id));
+  return id;
+}
+function dlgBusy(on,text,step){
+  nd.busy=on;$('#dBusy').hidden=!on;
+  $('#dBusyText').textContent=text||'Обработка…';$('#dBusyStep').textContent=step||'';
+  ['dEval','dSaveOnly','dCancel'].forEach(id=>{$('#'+id).disabled=on;});
+}
+function setDlgMode(m){
+  nd.mode=m;
+  $$('#dMode button').forEach(b=>b.classList.toggle('on',b.dataset.mode===m));
+  $('#textPane').hidden=m!=='text';$('#audioPane').hidden=m!=='audio';
+  $('#fldLang').hidden=m==='audio';$('#fldOp').hidden=m!=='audio';
+  $('#dChannel').disabled=m==='audio'||!!nd.carry;
+  if(m==='audio'){if(nd.prevChannel==null)nd.prevChannel=$('#dChannel').value;$('#dChannel').value='call';}
+  else if(nd.prevChannel!=null){if(!nd.carry)$('#dChannel').value=nd.prevChannel;nd.prevChannel=null;}
+  $('#dEval').textContent=m==='audio'?'Распознать и оценить 🎙️':'Оценить с помощью ИИ';
+  $('#dSaveOnly').textContent=m==='audio'?'Только распознать':'Только добавить';
+}
+function renderCarry(){
+  $('#dCarry').hidden=!nd.carry;
+  if(nd.carry){$('#dCarryText').textContent='Запись «'+nd.carry.name+'» будет прикреплена к диалогу.';$('#dChannel').value='call';}
+  $('#dChannel').disabled=nd.mode==='audio'||!!nd.carry;
+}
+function updateParseInfo(){
+  const box=$('#dParse'),txt=$('#dText').value;
+  if(!txt.trim()){box.className='parse-info';box.textContent='Вставьте транскрипт или выберите пример.';return null;}
+  const p=parseTranscript(txt),cnt=k=>p.messages.filter(m=>m.speaker===k).length;
+  if(p.errors.length){
+    box.className='parse-info err';
+    box.innerHTML='Ошибки разбора: '+p.errors.slice(0,4).map(esc).join(' · ')+(p.errors.length>4?' · …ещё '+(p.errors.length-4):'');
+    return p;
+  }
+  box.className='parse-info '+(p.warnings.length?'warn':'ok');
+  box.innerHTML='Распознано реплик: <b>'+p.messages.length+'</b> (operator '+cnt('operator')+' · client '+cnt('client')+' · bot '+cnt('bot')+' · system '+cnt('system')+')'+(p.warnings.length?'<br>'+p.warnings.slice(0,3).map(esc).join('<br>'):'');
+  return p;
+}
+function clearAudioFile(){
+  if(nd.fileUrl){try{URL.revokeObjectURL(nd.fileUrl);}catch(e){}}
+  nd.file=null;nd.fileUrl=null;
+  const p=$('#dPreview');try{p.pause();}catch(e){}p.removeAttribute('src');
+  $('#dFileInfo').hidden=true;$('#dFile').value='';
+}
+function setAudioFile(file){
+  if(!file)return;
+  const ext=(file.name.split('.').pop()||'').toLowerCase();
+  if(!(file.type&&file.type.indexOf('audio/')===0)&&AUDIO_EXT.indexOf(ext)<0){toast('Неподдерживаемый файл «'+file.name+'». Нужна аудиозапись: mp3, wav, m4a или ogg','err',6500);return;}
+  if(!file.size){toast('Файл «'+file.name+'» пустой','err');return;}
+  if(file.size>MAX_AUDIO){toast('Файл «'+file.name+'» весит '+fmtSize(file.size)+' — лимит Whisper API 25 МБ. Сожмите запись (например, mp3 64 кбит/с) или обрежьте её.','err',10000);return;}
+  clearAudioFile();
+  nd.file=file;nd.fileUrl=URL.createObjectURL(file);
+  $('#fName').textContent=file.name;$('#fSize').textContent=fmtSize(file.size);
+  $('#dPreview').src=nd.fileUrl;$('#dFileInfo').hidden=false;
+}
+function openNewDialog(){
+  $('#dId').value=nextManualId();$('#dChannel').value='chat';$('#dLang').value='RU';$('#dOp').value='';$('#dText').value='';
+  nd.carry=null;nd.prevChannel=null;renderCarry();clearAudioFile();$('#aLang').value='AUTO';$('#aReview').checked=false;
+  setDlgMode('text');updateParseInfo();
+  $('#dlgModal').classList.add('show');setTimeout(()=>$('#dText').focus(),30);
+}
+function closeNewDialog(){if(nd.busy)return;clearAudioFile();$('#dlgModal').classList.remove('show');}
+function checkId(id){
+  if(!/^[A-Za-z0-9_.\-]{3,40}$/.test(id))return 'ID: 3–40 символов — латиница, цифры, «_», «.», «-»';
+  if(state.list.some(d=>d.conversation_id===id))return 'Диалог с ID «'+id+'» уже есть в списке';
+  return '';
+}
+async function afterCreate(id,evaluate,extra){
+  $('#dlgModal').classList.remove('show');clearAudioFile();
+  Object.assign(state.filters,{dataset:'all',channel:'all',lang:'all',status:'all',q:''});
+  await loadList();
+  await selectDialog(id,true);
+  const li=$('#dlgList .li[data-id="'+CSS.escape(id)+'"]');if(li)li.scrollIntoView({block:'nearest'});
+  if(!evaluate){toast('Диалог '+id+' добавлен в набор MANUAL'+(extra||'')+'. Оценить можно кнопкой в карточке.','ok',5000);return;}
+  if(!state.health||!state.health.llm_configured){toast('Диалог '+id+' добавлен, но LLM на сервере не настроена — задайте OPENAI_API_KEY в .env','warn',8000);return;}
+  toast('Диалог '+id+' добавлен'+(extra||'')+'. ИИ оценивает по чек-листу…','info',4000);
+  evaluateOne(id);
+}
+async function submitText(evaluate){
+  const id=$('#dId').value.trim(),err=checkId(id);
+  if(err){toast(err,'warn',5500);return;}
+  const p=parseTranscript($('#dText').value);
+  if(p.errors.length){updateParseInfo();toast(p.errors[0],'warn',5500);return;}
+  if(p.messages.length<2){toast('Нужно минимум 2 реплики','warn');return;}
+  if(!p.messages.some(m=>m.speaker==='operator')||!p.messages.some(m=>m.speaker==='client')){toast('В транскрипте должны быть реплики и operator, и client','warn',5500);return;}
+  dlgBusy(true,'Сохраняю диалог…');
+  try{
+    await api('/conversations',{method:'POST',body:{conversation_id:id,channel:$('#dChannel').value,language:$('#dLang').value,transcript:p.messages,audio_file:nd.carry?nd.carry.audio_file:null}});
+    dlgBusy(false);nd.carry=null;
+    await afterCreate(id,evaluate);
+  }catch(e){dlgBusy(false);toast(e.message,'err',8000);}
+}
+async function submitAudio(evaluate){
+  const id=$('#dId').value.trim(),err=checkId(id);
+  if(err){toast(err,'warn',5500);return;}
+  if(!nd.file){toast('Сначала прикрепите аудиофайл','warn');return;}
+  if(state.health&&state.health.stt_configured===false){toast('Распознавание речи на сервере не настроено: задайте OPENAI_API_KEY (или CQA_STT_API_KEY) в .env','err',8000);return;}
+  const fd=new FormData();fd.append('file',nd.file,nd.file.name);
+  const q='?language='+encodeURIComponent($('#aLang').value)+($('#dOp').value.trim()?'&operator='+encodeURIComponent($('#dOp').value.trim()):'');
+  dlgBusy(true,'Распознаю речь и размечаю роли говорящих…','Шаг 1–2 из 3 · Whisper → роли (может занять до пары минут)');
+  let res;
+  try{
+    const r=await fetch(API+'/transcribe'+q,{method:'POST',body:fd});
+    res=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(res.detail||r.statusText||'Ошибка сервера');
+  }catch(e){dlgBusy(false);toast('✖ '+e.message,'err',10000);return;}
+  (res.warnings||[]).forEach(w=>toast(w,'warn',8000));
+  const name=nd.file.name;
+  const lines=res.transcript.map(t=>t.timestamp+' '+t.speaker+': '+t.text).join('\n');
+  const review=!evaluate||!res.roles_ok||$('#aReview').checked;
+  if(review){
+    /* распознавание уже оплачено — переносим результат в текстовый режим для проверки ролей */
+    dlgBusy(false);
+    nd.carry={audio_file:res.audio_file,name:name};clearAudioFile();
+    $('#dLang').value=res.language||'RU';$('#dText').value=lines;
+    setDlgMode('text');renderCarry();updateParseInfo();
+    toast('Распознано реплик: '+res.transcript.length+' · '+fmtSec(res.duration)+'. Проверьте роли operator/client и нажмите «Оценить с помощью ИИ».','info',9000);
+    return;
+  }
+  dlgBusy(true,'Сохраняю диалог…','Шаг 3 из 3 · оценка по чек-листу');
+  try{
+    await api('/conversations',{method:'POST',body:{conversation_id:id,channel:'call',language:res.language||'RU',transcript:res.transcript,audio_file:res.audio_file}});
+    dlgBusy(false);
+    await afterCreate(id,true,' из записи «'+name+'» ('+res.transcript.length+' реплик, '+fmtSec(res.duration)+')');
+  }catch(e){
+    dlgBusy(false);
+    nd.carry={audio_file:res.audio_file,name:name};clearAudioFile();
+    $('#dLang').value=res.language||'RU';$('#dText').value=lines;setDlgMode('text');renderCarry();updateParseInfo();
+    toast('✖ '+e.message+' — распознанный транскрипт перенесён в текстовый режим.','err',10000);
+  }
+}
+function bindNewDialog(){
+  $('#btnNewDlg').addEventListener('click',openNewDialog);
+  $$('#dMode button').forEach(b=>b.addEventListener('click',()=>{if(!nd.busy)setDlgMode(b.dataset.mode);}));
+  $$('[data-ex]').forEach(b=>b.addEventListener('click',()=>{
+    const e=EXAMPLES[b.dataset.ex];
+    if(!nd.carry)$('#dChannel').value=e.channel;
+    $('#dLang').value=e.lang;$('#dText').value=e.text;updateParseInfo();
+  }));
+  $('#dText').addEventListener('input',updateParseInfo);
+  $('#dCarryDrop').addEventListener('click',()=>{nd.carry=null;renderCarry();});
+  $('#dPick').addEventListener('click',e=>{e.stopPropagation();$('#dFile').click();});
+  $('#dFile').addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];if(f)setAudioFile(f);});
+  $('#fClear').addEventListener('click',clearAudioFile);
+  const dz=$('#dDrop');
+  ['dragenter','dragover'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add('over');}));
+  ['dragleave','drop'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove('over');}));
+  dz.addEventListener('drop',e=>{const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];if(f)setAudioFile(f);});
+  dz.addEventListener('click',e=>{if(!e.target.closest('button'))$('#dFile').click();});
+  dz.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();$('#dFile').click();}});
+  $('#dEval').addEventListener('click',()=>nd.mode==='audio'?submitAudio(true):submitText(true));
+  $('#dSaveOnly').addEventListener('click',()=>nd.mode==='audio'?submitAudio(false):submitText(false));
+  $('#dCancel').addEventListener('click',closeNewDialog);
+  $('#dlgModal').addEventListener('click',e=>{if(e.target.id==='dlgModal')closeNewDialog();});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#dlgModal').classList.contains('show'))closeNewDialog();});
+}
+
+/* =====================================================================
    СОБЫТИЯ
 ===================================================================== */
 function bind(){
@@ -1378,7 +1723,7 @@ function bind(){
 
   /* клавиатура: ↑/↓ или j/k — соседний диалог, / — поиск */
   document.addEventListener('keydown',e=>{
-    if(state.view!=='dialogs'||$('#modal').classList.contains('show'))return;
+    if(state.view!=='dialogs'||$('#modal').classList.contains('show')||$('#dlgModal').classList.contains('show'))return;
     const tag=(e.target.tagName||'').toLowerCase();
     if(tag==='input'||tag==='textarea'||tag==='select'||e.ctrlKey||e.metaKey||e.altKey)return;
     if(e.key==='/'){e.preventDefault();const s=$('#fSearch');if(s){s.focus();s.select();}return;}
@@ -1475,6 +1820,7 @@ function bind(){
 ===================================================================== */
 async function init(){
   bind();
+  bindNewDialog();
   renderTranscript();renderScorecard();
   try{
     await Promise.all([loadHealth(),loadChecklist(),loadPrecedents()]);

@@ -45,6 +45,11 @@ LLM_SAMPLES = int(os.getenv("CQA_SAMPLES", "1"))
 LLM_VERIFY = os.getenv("CQA_VERIFY", "1") not in ("0", "false", "no")
 # Сколько последних прецедентов (решений супервизора) по критерию подмешивать в промпт.
 PRECEDENTS_PER_CRITERION = int(os.getenv("CQA_PRECEDENTS", "6"))
+# Распознавание речи для загруженных аудиозаписей (OpenAI Whisper API или совместимый сервис).
+# По умолчанию — тот же ключ и адрес, что у LLM.
+STT_MODEL = os.getenv("CQA_STT_MODEL", "whisper-1")
+STT_API_KEY = os.getenv("CQA_STT_API_KEY") or LLM_API_KEY
+STT_BASE_URL = os.getenv("CQA_STT_BASE_URL") or LLM_BASE_URL
 # Цена за 1M токенов (USD) — для расчёта стоимости одной оценки. Задайте под свою модель.
 PRICE_INPUT_PER_M = float(os.getenv("CQA_PRICE_INPUT_PER_M", "2.0"))
 PRICE_CACHED_INPUT_PER_M = float(os.getenv("CQA_PRICE_CACHED_INPUT_PER_M", "0.5"))
