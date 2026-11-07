@@ -1,30 +1,1268 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>CQA — оценка качества диалогов</title>
-  <link rel="stylesheet" href="/static/styles.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Freedom CQA — Conversation Quality Assurance</title>
+<style>
+:root{
+  --g900:#06301f;--g800:#0a4a30;--g700:#0e6140;--g600:#117a4e;--g500:#1a9a63;--g100:#e3f1ea;--g50:#f1f8f4;
+  --n0:#fff;--n10:#faf9f8;--n20:#f3f2f1;--n30:#edebe9;--n40:#e1dfdd;--n60:#a19f9d;--n80:#605e5c;--n100:#323130;
+  --ok:#0e6b38;--ok-bg:#dff6dd;--warn:#7a5400;--warn-bg:#fff4ce;--warn-bd:#f2c94c;
+  --err:#a4262c;--err-bg:#fde7e9;--info:#005a9e;--info-bg:#deecf9;
+  --shadow:0 1.6px 3.6px rgba(0,0,0,.13),0 .3px .9px rgba(0,0,0,.1);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:'Segoe UI','Inter',system-ui,-apple-system,Roboto,Arial,sans-serif;font-size:14px;color:var(--n100);background:var(--n20);height:100vh;display:flex;flex-direction:column;overflow:hidden}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+
+/* ---------- top bar ---------- */
+.topbar{background:var(--g900);color:#fff;display:flex;align-items:center;gap:16px;padding:0 16px;min-height:48px;flex-wrap:wrap;flex:none}
+.brand{display:flex;align-items:center;gap:10px;font-weight:600;font-size:15px}
+.logo{width:26px;height:26px;border-radius:4px;background:var(--g500);display:grid;place-items:center;font-weight:700;font-size:15px}
+.brand small{opacity:.7;font-weight:400;font-size:12px}
+.top-right{margin-left:auto;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:6px 0}
+.gid{display:flex;gap:6px;align-items:center}
+.gid label{font-size:12px;opacity:.85}
+.gid input{height:30px;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.08);color:#fff;padding:0 8px;border-radius:2px;width:140px}
+.gid input::placeholder{color:rgba(255,255,255,.55)}
+.gid input:focus{outline:2px solid var(--g500);outline-offset:0}
+.env{font-size:11px;font-weight:700;letter-spacing:.5px;background:var(--warn-bd);color:#3a2a00;padding:2px 7px;border-radius:10px}
+.seg{display:inline-flex;border:1px solid rgba(255,255,255,.35);border-radius:2px;overflow:hidden}
+.seg button{background:transparent;border:0;color:#fff;padding:0 12px;height:28px;font-size:13px}
+.seg button.on{background:#fff;color:var(--g800);font-weight:600}
+.avatar{width:30px;height:30px;border-radius:50%;background:var(--g600);display:grid;place-items:center;font-size:12px;font-weight:600}
+
+/* ---------- buttons ---------- */
+.btn{height:32px;padding:0 14px;border:1px solid var(--n60);background:#fff;border-radius:2px;font-weight:600;font-size:13px;color:var(--n100)}
+.btn:hover{background:var(--n20)}
+.btn.primary{background:var(--g700);border-color:var(--g700);color:#fff}
+.btn.primary:hover{background:var(--g800)}
+.btn.light{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.4);color:#fff}
+.btn.light:hover{background:rgba(255,255,255,.22)}
+.btn.sm{height:26px;padding:0 10px;font-size:12px}
+.btn.danger{color:var(--err);border-color:var(--err)}
+.btn.danger:hover{background:var(--err-bg)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.busy{opacity:.7;pointer-events:none}
+
+/* ---------- tabs ---------- */
+.tabs{background:#fff;border-bottom:1px solid var(--n40);display:flex;align-items:flex-end;gap:2px;padding:0 12px;flex:none;flex-wrap:wrap}
+.tab{background:none;border:0;border-bottom:3px solid transparent;padding:11px 14px 8px;font-weight:600;color:var(--n80)}
+.tab:hover{color:var(--g700)}
+.tab.active{color:var(--g700);border-bottom-color:var(--g600)}
+.tabs-note{margin-left:auto;color:var(--n80);font-size:12px;padding:0 6px 10px}
+
+.view{display:none;flex:1;min-height:0}
+.view.active{display:block}
+
+/* ---------- 3-column layout ---------- */
+.grid{display:grid;grid-template-columns:320px minmax(0,1fr) 440px;height:100%}
+.col{overflow:auto;background:#fff;border-right:1px solid var(--n40);min-height:0}
+.col:last-child{border-right:0}
+#colTranscript{background:var(--n10);display:flex;flex-direction:column;overflow:hidden}
+.pane-title{font-size:12px;font-weight:700;letter-spacing:.4px;color:var(--n80);text-transform:uppercase;margin:0 0 8px}
+
+/* filters + list */
+.filters{padding:12px;border-bottom:1px solid var(--n40);background:var(--n10)}
+.fgroup{margin-bottom:8px}
+.fgroup:last-child{margin-bottom:0}
+.fgroup .flabel{font-size:11px;color:var(--n80);font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px}
+.chips{display:flex;flex-wrap:wrap;gap:4px}
+.chip{border:1px solid var(--n40);background:#fff;border-radius:14px;padding:3px 10px;font-size:12px;color:var(--n100)}
+.chip:hover{border-color:var(--g600)}
+.chip.on{background:var(--g700);border-color:var(--g700);color:#fff}
+.list-meta{padding:8px 12px;font-size:12px;color:var(--n80);border-bottom:1px solid var(--n30)}
+.li{padding:10px 12px;border-bottom:1px solid var(--n30);cursor:pointer;border-left:4px solid transparent}
+.li:hover{background:var(--n10)}
+.li.sel{background:var(--g50);border-left-color:var(--g600)}
+.li:focus-visible{outline:2px solid var(--g600);outline-offset:-2px}
+.li-top{display:flex;align-items:center;gap:8px}
+.li-top .ico{color:var(--g700);display:inline-flex}
+.li-top b{font-size:13px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.li-meta{font-size:12px;color:var(--n80);margin:2px 0 6px 24px}
+.li-badges{display:flex;gap:4px;flex-wrap:wrap;margin-left:24px}
+.sc-pill{font-weight:700;font-size:13px;padding:1px 8px;border-radius:10px}
+.sc-pill.hi{background:var(--ok-bg);color:var(--ok)}
+.sc-pill.mid{background:var(--warn-bg);color:var(--warn)}
+.sc-pill.lo{background:var(--err-bg);color:var(--err)}
+.li .was{font-size:11px;color:var(--n80);margin-left:24px;margin-top:3px}
+.empty{padding:28px 16px;color:var(--n80);text-align:center}
+
+/* badges */
+.b{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:3px;white-space:nowrap;border:1px solid transparent}
+.b.ok{background:var(--ok-bg);color:var(--ok)}
+.b.warn{background:var(--warn-bg);color:var(--warn);border-color:var(--warn-bd)}
+.b.err{background:var(--err-bg);color:var(--err);border-color:#f1b8bc}
+.b.info{background:var(--info-bg);color:var(--info)}
+.b.gray{background:var(--n30);color:var(--n80)}
+.b.lang{background:#fff;border-color:var(--n60);color:var(--n80)}
+
+/* ---------- transcript ---------- */
+.t-head{background:#fff;border-bottom:1px solid var(--n40);padding:12px 16px;flex:none}
+.t-head h2{margin:0 0 4px;font-size:16px;font-weight:600}
+.t-sub{font-size:12px;color:var(--n80);display:flex;gap:6px 14px;flex-wrap:wrap;align-items:center}
+.audio{background:#fff;border-bottom:1px solid var(--n40);padding:10px 16px;flex:none}
+.audio audio{width:100%;height:36px}
+.a-row{display:flex;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap}
+.a-row .src{font-size:11px;color:var(--n80);margin-left:auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.a-row select{height:26px;border:1px solid var(--n60);border-radius:2px;background:#fff;font-size:12px}
+.t-scroll{flex:1;overflow:auto;padding:16px;position:relative}
+.msg{display:flex;margin:0 0 10px}
+.msg .bubble{max-width:78%;border-radius:6px;padding:8px 12px;border:1px solid var(--n40);background:#fff}
+.msg.client{justify-content:flex-start}
+.msg.operator{justify-content:flex-end}
+.msg.operator .bubble{background:var(--g100);border-color:#b7dbc8}
+.msg.bot,.msg.system{justify-content:center}
+.msg.bot .bubble{background:var(--n30);border-color:var(--n40);color:var(--n80);max-width:70%;text-align:center}
+.msg.system .bubble{background:transparent;border:1px dashed var(--n60);color:var(--n80);font-size:12px;font-style:italic;max-width:80%;text-align:center;padding:4px 12px}
+.m-head{display:flex;gap:10px;justify-content:space-between;align-items:center;font-size:11px;color:var(--n80);margin-bottom:3px;font-weight:600}
+.msg.operator .m-head{color:var(--g800)}
+.m-head .t{background:none;border:0;padding:0;font-size:11px;color:var(--info);font-variant-numeric:tabular-nums}
+.m-head .t:hover{text-decoration:underline}
+.m-text{white-space:pre-wrap;word-break:break-word;line-height:1.45}
+.msg.playing .bubble{box-shadow:0 0 0 2px var(--g500)}
+@keyframes flash{0%{background:#ffe066;box-shadow:0 0 0 5px rgba(255,214,0,.55)}60%{background:#fff0a8;box-shadow:0 0 0 3px rgba(255,214,0,.3)}100%{box-shadow:0 0 0 0 rgba(255,214,0,0)}}
+.msg.hl .bubble{animation:flash 2.6s ease-out}
+
+/* ---------- scorecard ---------- */
+.sc-head{display:flex;gap:16px;align-items:center;padding:16px;border-bottom:1px solid var(--n40);background:linear-gradient(180deg,var(--g50),#fff)}
+.ring{position:relative;width:128px;height:128px;flex:none}
+.ring svg{width:100%;height:100%}
+.ring .bg{fill:none;stroke:var(--n30);stroke-width:10}
+.ring .fg{fill:none;stroke-width:10;stroke-linecap:round;transition:stroke-dashoffset .6s}
+.ring.hi .fg{stroke:var(--g600)}
+.ring.mid .fg{stroke:#d29200}
+.ring.lo .fg{stroke:#c4314b}
+.ring-num{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ring-num b{font-size:26px;line-height:1}
+.ring-num span{font-size:11px;color:var(--n80);margin-top:3px}
+.sc-meta{min-width:0;display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--n80)}
+.sc-meta .ttl{font-size:15px;font-weight:600;color:var(--n100)}
+.flow{font-size:13px;color:var(--n100);font-weight:600}
+.flow .arrow{color:var(--n80);margin:0 4px}
+.flow .up{color:var(--ok)}.flow .down{color:var(--err)}
+.sc-badges{display:flex;gap:6px;flex-wrap:wrap}
+.gross-banner{margin:12px 16px 0;background:var(--err);color:#fff;border-radius:3px;padding:10px 12px}
+.gross-banner b{display:block;font-size:14px;margin-bottom:3px}
+.gross-banner .ev{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.5);color:#fff}
+.role-hint{margin:12px 16px 0;padding:8px 10px;background:var(--info-bg);color:var(--info);border-radius:3px;font-size:12px}
+.acc-tools{display:flex;justify-content:space-between;align-items:center;padding:12px 16px 6px}
+.linkbtn{background:none;border:0;color:var(--info);padding:0;font-size:12px}
+.linkbtn:hover{text-decoration:underline}
+.acc{margin:0 16px 8px;border:1px solid var(--n40);border-radius:3px;background:#fff}
+.acc.has-appeal{border-color:var(--warn-bd)}
+.acc-head{display:flex;align-items:center;gap:8px;padding:9px 10px;cursor:pointer;user-select:none}
+.acc-head:hover{background:var(--n10)}
+.acc-head:focus-visible{outline:2px solid var(--g600);outline-offset:-2px}
+.chev{width:12px;height:12px;flex:none;transition:transform .15s;color:var(--n80)}
+.acc.open .chev{transform:rotate(90deg)}
+.code{font-weight:700;color:var(--g700);font-size:12px;flex:none;width:20px}
+.cname{flex:1;min-width:0;font-weight:600;font-size:13px;line-height:1.25}
+.acc-right{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.wtag{font-size:11px;color:var(--n80)}
+.acc-body{display:none;padding:4px 12px 12px 30px;border-top:1px solid var(--n30);font-size:13px}
+.acc.open .acc-body{display:block}
+.kv{margin-top:10px}
+.kv .k{font-size:11px;font-weight:700;color:var(--n80);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px}
+.calc{background:var(--n10);border:1px solid var(--n30);border-radius:3px;padding:7px 9px;font-size:12px;line-height:1.5}
+.ev{display:inline-flex;align-items:center;gap:6px;max-width:100%;background:var(--info-bg);border:1px solid #b6d4ee;color:var(--info);border-radius:12px;padding:2px 10px 2px 8px;font-size:12px;margin:0 6px 4px 0}
+.ev:hover{background:#cfe4f6}
+.ev .snip{color:var(--n80);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:190px}
+.ev .tm{font-weight:700;font-variant-numeric:tabular-nums}
+.box{border:1px solid var(--n40);border-radius:3px;padding:8px 10px;margin-top:10px;background:#fff}
+.box.appeal{background:var(--warn-bg);border-color:var(--warn-bd)}
+.box.review{background:var(--g50);border-color:#b7dbc8}
+.box .h{font-size:12px;font-weight:700;margin-bottom:3px}
+.warnline{margin-top:8px;color:var(--err);font-size:12px;font-weight:600}
+.rev-form{margin-top:12px;border-top:1px dashed var(--n60);padding-top:10px}
+.rev-form label{display:block;font-size:12px;font-weight:600;margin-bottom:8px}
+.rev-form select,.rev-form textarea,.modal textarea{display:block;width:100%;margin-top:3px;border:1px solid var(--n60);border-radius:2px;padding:6px 8px;background:#fff}
+.rev-form textarea,.modal textarea{min-height:64px;resize:vertical}
+.rev-form select{width:auto;min-width:130px;height:30px}
+.hist{margin:8px 16px 20px;border:1px solid var(--n40);border-radius:3px}
+.hist h4{margin:0;padding:8px 10px;font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:var(--n80);background:var(--n10);border-bottom:1px solid var(--n30)}
+.hist ul{list-style:none;margin:0;padding:0}
+.hist li{padding:7px 10px;font-size:12px;border-bottom:1px solid var(--n30);line-height:1.4}
+.hist li:last-child{border-bottom:0}
+.hist .when{color:var(--n80)}
+
+/* ---------- modal & toasts ---------- */
+.modal-back{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:50;padding:16px}
+.modal-back.show{display:flex}
+.modal{background:#fff;border-radius:4px;box-shadow:0 8px 24px rgba(0,0,0,.3);width:100%;max-width:520px}
+.modal header{padding:14px 18px;border-bottom:1px solid var(--n40);font-weight:600;font-size:16px}
+.modal .body{padding:14px 18px;font-size:13px}
+.modal footer{padding:12px 18px;border-top:1px solid var(--n40);display:flex;justify-content:flex-end;gap:8px}
+#toasts{position:fixed;right:16px;bottom:16px;display:flex;flex-direction:column;gap:8px;z-index:60;max-width:min(420px,calc(100vw - 32px))}
+.toast{background:var(--n100);color:#fff;padding:10px 14px;border-radius:3px;box-shadow:var(--shadow);font-size:13px;line-height:1.4;border-left:4px solid var(--n60);transition:opacity .3s,transform .3s}
+.toast.ok{border-left-color:var(--g500)}
+.toast.warn{border-left-color:var(--warn-bd)}
+.toast.err{border-left-color:#ff6b73}
+.toast.info{border-left-color:#5aa9e6}
+.toast.out{opacity:0;transform:translateX(20px)}
+
+/* ---------- settings ---------- */
+.settings{height:100%;overflow:auto;padding:20px}
+.card{background:#fff;border:1px solid var(--n40);border-radius:3px;box-shadow:var(--shadow);max-width:1120px;margin:0 auto 16px}
+.card>header{padding:14px 18px;border-bottom:1px solid var(--n40)}
+.card>header h2{margin:0;font-size:17px;font-weight:600}
+.card>header p{margin:4px 0 0;color:var(--n80);font-size:12px}
+.tbl-wrap{overflow:auto}
+table.t{border-collapse:collapse;width:100%;min-width:760px}
+table.t th{background:var(--n10);text-align:left;font-size:12px;color:var(--n80);padding:8px 10px;border-bottom:1px solid var(--n40);white-space:nowrap}
+table.t td{padding:8px 10px;border-bottom:1px solid var(--n30);vertical-align:middle}
+table.t td.num{font-weight:700;color:var(--g700);width:44px}
+table.t input[type=text],table.t input[type=number],table.t select{height:30px;border:1px solid var(--n60);border-radius:2px;padding:0 8px;background:#fff;width:100%}
+table.t input.in-w{width:84px}
+table.t input.bad{border-color:var(--err);background:var(--err-bg)}
+table.t select:disabled{background:var(--n20);color:var(--n80)}
+.typecell{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.typecell select{width:140px}
+.typecell input.in-scale{width:170px}
+.switch{position:relative;display:inline-block;width:38px;height:20px}
+.switch input{opacity:0;width:0;height:0}
+.switch span{position:absolute;inset:0;background:var(--n60);border-radius:20px;transition:.15s;cursor:pointer}
+.switch span:before{content:"";position:absolute;width:14px;height:14px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.15s}
+.switch input:checked+span{background:var(--g600)}
+.switch input:checked+span:before{transform:translateX(18px)}
+.set-foot{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:12px 18px;border-top:1px solid var(--n40);background:var(--n10)}
+.sumbox{font-weight:700;padding:4px 10px;border-radius:3px;font-size:13px}
+.sumbox.ok{background:var(--ok-bg);color:var(--ok)}
+.sumbox.err{background:var(--err-bg);color:var(--err)}
+.spacer{flex:1}
+.errs{padding:0 18px 12px;color:var(--err);font-size:12px;font-weight:600}
+.errs div{margin-top:3px}
+.formula{padding:10px 18px;font-size:12px;color:var(--n80);border-top:1px solid var(--n30)}
+.delta.up{color:var(--ok);font-weight:700}.delta.down{color:var(--err);font-weight:700}.delta.zero{color:var(--n80)}
+
+/* ---------- responsive ---------- */
+@media (max-width:1380px){.grid{grid-template-columns:280px minmax(0,1fr) 400px}}
+@media (max-width:1100px){
+  body{height:auto;overflow:auto}
+  .view.active{display:block}
+  .grid{display:block;height:auto}
+  .col{border-right:0;border-bottom:8px solid var(--n20);overflow:visible}
+  #dlgList{max-height:320px;overflow:auto}
+  #colTranscript{display:block;overflow:visible}
+  .t-scroll{max-height:520px}
+  .settings{height:auto;padding:12px}
+  .sc-head{flex-wrap:wrap}
+}
+@media (max-width:560px){
+  .top-right{margin-left:0;width:100%}
+  .gid{flex:1}.gid input{flex:1;width:auto}
+  .tabs-note{display:none}
+  .msg .bubble{max-width:92%}
+  .ev .snip{max-width:110px}
+}
+
+/* ---------- дополнения: реальный бэкенд и ИИ ---------- */
+.list-actions{padding:8px 12px;border-bottom:1px solid var(--n30);display:flex;gap:6px;flex-wrap:wrap;align-items:center;background:#fff}
+.prog{flex:1 1 100%;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--n80)}
+.prog .bar{flex:1;height:6px;background:var(--n30);border-radius:3px;overflow:hidden}
+.prog .bar>div{height:100%;background:var(--g600);transition:width .3s}
+.spin{width:12px;height:12px;border:2px solid rgba(0,0,0,.15);border-top-color:var(--g600);border-radius:50%;display:inline-block;animation:sp .8s linear infinite;vertical-align:-2px}
+.btn.primary .spin{border-color:rgba(255,255,255,.35);border-top-color:#fff}
+@keyframes sp{to{transform:rotate(360deg)}}
+.dots{display:flex;gap:2px;margin:6px 0 0 24px}
+.dot{width:16px;height:6px;border-radius:2px;background:var(--n30)}
+.dot.ok{background:#5bb37f}.dot.warn{background:#e2b33c}.dot.err{background:#d9534f}.dot.na{background:#b9b7b5}
+.sc-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
+.aimeta{font-size:11px;color:var(--n80);line-height:1.5}
+.sections{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:6px;padding:10px 16px 0}
+.secbox{border:1px solid var(--n30);border-radius:3px;padding:6px 8px;background:#fff}
+.secbox .n{font-size:11px;color:var(--n80);line-height:1.2}
+.secbox .v{font-weight:700;font-size:13px}
+.secbox .bar{height:4px;background:var(--n30);border-radius:2px;margin-top:4px;overflow:hidden}
+.secbox .bar>div{height:100%;background:var(--g600)}
+.ev.range{background:var(--warn-bg);border-color:var(--warn-bd);color:var(--warn)}
+.msg.inrange .bubble{border-left:3px solid var(--warn-bd)}
+.msg .mid{font-family:Consolas,ui-monospace,monospace;font-size:10px;color:var(--n60);margin-right:4px}
+details.reason summary{cursor:pointer;font-size:12px;color:var(--info)}
+details.reason p{white-space:pre-wrap;font-size:12px;color:var(--n80);margin:6px 0 0}
+.gold-row{margin-top:10px;padding:8px 10px;border:1px dashed var(--info);border-radius:3px;background:var(--info-bg);font-size:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.gold-row select{height:26px;border:1px solid var(--n60);border-radius:2px;background:#fff}
+.notice{margin:12px 16px 0;padding:10px 12px;border-radius:3px;font-size:13px}
+.notice.warn{background:var(--warn-bg);border:1px solid var(--warn-bd);color:var(--warn)}
+.notice.info{background:var(--info-bg);color:var(--info)}
+.detail-row td{background:var(--n10)}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.detail-grid label{display:flex;flex-direction:column;gap:3px;font-size:11px;font-weight:700;color:var(--n80);text-transform:uppercase;letter-spacing:.3px}
+.detail-grid textarea,.detail-grid select{border:1px solid var(--n60);border-radius:2px;padding:6px 8px;background:#fff;font-weight:400;text-transform:none;letter-spacing:0;color:var(--n100);min-height:54px;resize:vertical}
+.detail-grid select{min-height:30px}
+.detail-grid .full{grid-column:1/-1}
+@media (max-width:900px){.detail-grid{grid-template-columns:1fr}}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;padding:14px 18px}
+.stat{border:1px solid var(--n30);border-radius:3px;padding:10px 12px;background:var(--n10)}
+.stat .n{font-size:11px;color:var(--n80);text-transform:uppercase;letter-spacing:.3px;font-weight:700}
+.stat .v{font-size:22px;font-weight:700;margin-top:2px}
+.stat .s{font-size:11px;color:var(--n80)}
+.view.active.scroll{overflow:auto}
+table.t .typecell select{width:130px}
+table.t .typecell input.in-scale{width:130px}
+table.t td:nth-child(2){min-width:280px}
+</style>
 </head>
 <body>
-  <!-- Весь интерфейс живёт внутри #cqa-app: его можно встроить как HTML web resource в Dynamics 365,
-       задав window.CQA_API_BASE на адрес сервиса оценки. -->
-  <div id="cqa-app">
-    <header class="topbar">
-      <div class="brand"><span class="logo">CQA</span><span class="brand-sub">Conversation Quality Analytics</span></div>
-      <nav class="tabs">
-        <a href="#/" data-tab="list">Диалоги</a>
-        <a href="#/checklists" data-tab="checklists">Чек-лист</a>
-        <a href="#/appeals" data-tab="appeals">Апелляции <span id="appeals-badge" class="badge hidden"></span></a>
-        <a href="#/stats" data-tab="stats">Сводка</a>
-      </nav>
-      <div id="llm-status" class="llm-status"></div>
-    </header>
-    <main id="view"></main>
-    <div id="modal-root"></div>
-    <div id="toast" class="toast hidden"></div>
+
+<header class="topbar">
+  <div class="brand"><div class="logo">F</div><div>Freedom CQA <small>Conversation Quality Assurance</small></div></div>
+  <div class="top-right">
+    <div class="gid">
+      <label for="groupId">Group ID</label>
+      <input id="groupId" type="text" placeholder="например, DEV" autocomplete="off">
+      <button class="btn light sm" id="btnLoad">Загрузить с сервера</button>
+      <span class="env" id="envPill">—</span>
+    </div>
+    <div class="seg" id="roleSeg" title="Роль пользователя">
+      <button data-role="operator" class="on">Оператор</button>
+      <button data-role="supervisor">Супервизор</button>
+    </div>
+    <div class="avatar" id="avatar">ОП</div>
   </div>
-  <script>window.CQA_API_BASE = window.CQA_API_BASE || "";</script>
-  <script src="/static/app.js"></script>
+</header>
+
+<nav class="tabs">
+  <button class="tab active" data-view="dialogs">Диалоги и оценка</button>
+  <button class="tab" data-view="settings">Настройки чек-листа</button>
+  <button class="tab" data-view="stats">Точность и сводка</button>
+  <span class="tabs-note" id="tabsNote">Подключение к серверу…</span>
+</nav>
+
+<!-- ============ VIEW 1: DIALOGS ============ -->
+<main id="viewDialogs" class="view active">
+  <div class="grid">
+    <section class="col" id="colList" aria-label="Список диалогов">
+      <div class="filters" id="filters"></div>
+      <div class="list-actions" id="listActions"></div>
+      <div class="list-meta" id="listMeta"></div>
+      <div id="dlgList"></div>
+    </section>
+    <section class="col" id="colTranscript" aria-label="Транскрипт"><div id="transcriptPane" style="display:contents"></div></section>
+    <section class="col" id="colScore" aria-label="Карточка скоринга"><div id="scorePane"></div></section>
+  </div>
+</main>
+
+<!-- ============ VIEW 2: SETTINGS ============ -->
+<main id="viewSettings" class="view">
+  <div class="settings">
+    <div class="card">
+      <header>
+        <h2>Настройки чек-листа <span class="b gray" id="clVersion"></span></h2>
+        <p>«Применить» сохраняет новую версию чек-листа на сервере и переоценивает диалоги набора. ИИ заново оценивает только новые и изменённые критерии; при смене одних весов баллы пересчитываются без вызова модели, а вердикты супервизора по неизменённым критериям сохраняются.</p>
+      </header>
+      <div class="tbl-wrap">
+        <table class="t">
+          <thead><tr><th>№</th><th>Формулировка критерия</th><th>Тип / шкала</th><th>Вес</th><th>N/A доступен</th><th>Правила для ИИ</th><th></th></tr></thead>
+          <tbody id="setBody"></tbody>
+        </table>
+      </div>
+      <div class="errs" id="setErrors"></div>
+      <div class="set-foot">
+        <span class="sumbox ok" id="sumBox">Σ весов: 100.00 / 100</span>
+        <button class="btn" id="btnNormalize">Нормализовать до 100</button>
+        <button class="btn" id="btnAdd">+ Добавить критерий</button>
+        <button class="btn" id="btnResetDraft">Отменить правки</button>
+        <button class="btn" id="btnRegl">Вернуть регламент Freedom</button>
+        <span class="spacer"></span>
+        <button class="btn primary" id="btnApply">Применить и переоценить диалоги</button>
+      </div>
+      <div class="formula">
+        Перераспределение при N/A: <b>w′ᵢ = wᵢ / Σw<sub>активных</sub> × 100</b>. Критерий-флаг «Грубые ошибки» не имеет веса и не участвует в сумме.
+        Для шкальных критериев доля = ступень / максимум шкалы (например, критерий 06: (ступень / 10) × 15). Итог округляется до двух знаков.
+      </div>
+    </div>
+    <div class="card" id="reportCard" style="display:none">
+      <header><h2>Результат переоценки</h2><p id="reportNote"></p></header>
+      <div class="tbl-wrap">
+        <table class="t" style="min-width:600px">
+          <thead><tr><th>Диалог</th><th>Финал: был</th><th>ИИ: стало</th><th>Финал: стал</th><th>Δ финал</th></tr></thead>
+          <tbody id="reportBody"></tbody>
+        </table>
+      </div>
+      <div class="set-foot"><button class="btn primary" id="btnToDialogs">Перейти к диалогам</button></div>
+    </div>
+  </div>
+</main>
+
+<!-- ============ VIEW 3: STATS ============ -->
+<main id="viewStats" class="view">
+  <div class="settings" id="statsPane"></div>
+</main>
+
+<!-- appeal modal -->
+<div class="modal-back" id="modal" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+  <div class="modal">
+    <header id="mTitle">Оспорить критерий</header>
+    <div class="body">
+      <div id="mInfo" style="margin-bottom:10px"></div>
+      <label for="mWant" style="font-weight:600;font-size:12px">Какую оценку считаю верной (необязательно)</label>
+      <select id="mWant" style="display:block;margin:3px 0 10px;height:30px;border:1px solid var(--n60);border-radius:2px;background:#fff;min-width:140px"></select>
+      <label for="mText" style="font-weight:600;font-size:12px">Почему я не согласен</label>
+      <textarea id="mText" placeholder="Опишите, почему оценка по критерию неверна. Можно сослаться на время реплики."></textarea>
+    </div>
+    <footer>
+      <button class="btn" id="mCancel">Отмена</button>
+      <button class="btn primary" id="mSend">Отправить апелляцию</button>
+    </footer>
+  </div>
+</div>
+<div id="toasts" aria-live="polite"></div>
+
+<script>
+/* Freedom CQA — фронтенд. Все данные, оценки ИИ, апелляции и вердикты — через API сервиса оценки.
+   Для встраивания в Dynamics 365 как web resource задайте window.CQA_API_BASE (адрес сервиса). */
+(function(){
+'use strict';
+
+/* =====================================================================
+   УТИЛИТЫ
+===================================================================== */
+const API=(window.CQA_API_BASE||'')+'/api';
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const round2=n=>Math.round((n+Number.EPSILON)*100)/100;
+const fmt=n=>(n===null||n===undefined||isNaN(n))?'—':round2(n).toFixed(2);
+const pad=n=>String(n).padStart(2,'0');
+const fmtDate=iso=>iso?new Date(iso).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
+const fmtSec=s=>{s=Math.max(0,Math.round(s||0));return Math.floor(s/60)+':'+pad(s%60);};
+const clone=o=>JSON.parse(JSON.stringify(o));
+
+async function api(path,opts){
+  opts=opts||{};
+  const init={method:opts.method||'GET',headers:{}};
+  if(opts.body!==undefined){init.headers['Content-Type']='application/json';init.body=JSON.stringify(opts.body);}
+  const r=await fetch(API+path,init);
+  const data=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(data.detail||r.statusText||'Ошибка сервера');
+  return data;
+}
+function toast(msg,type,ms){
+  type=type||'info';
+  const t=document.createElement('div');
+  t.className='toast '+type;t.textContent=msg;
+  $('#toasts').appendChild(t);
+  setTimeout(()=>{t.classList.add('out');setTimeout(()=>t.remove(),320);},ms||4800);
+}
+function busy(btn,on,label){
+  if(!btn)return;
+  if(on){btn.dataset.label=btn.innerHTML;btn.classList.add('busy');btn.innerHTML='<span class="spin"></span> '+(label||'');}
+  else{btn.classList.remove('busy');if(btn.dataset.label)btn.innerHTML=btn.dataset.label;}
+}
+
+/* =====================================================================
+   СОСТОЯНИЕ
+===================================================================== */
+const state={
+  role:'operator',view:'dialogs',
+  filters:{dataset:'all',channel:'all',lang:'all',status:'all'},
+  selectedId:null,open:new Set(),
+  checklist:null,     // активный чек-лист с сервера
+  draft:null,         // черновик настроек
+  list:[],datasets:[],health:null,
+  detail:null,gold:null,
+  appealCtx:null,audioEl:null,
+  job:null,jobBefore:null,
+  labelMode:false,
+  evaluating:new Set()
+};
+
+/* ---------- ответы: API (yes/no/na/'20') ⇄ интерфейс (ДА/НЕТ/N/A/20) ---------- */
+const scaleVals=c=>(c.scale||[]).map(s=>Number(s.value));
+const scaleMax=c=>Math.max.apply(null,scaleVals(c));
+function uiVal(c,a){
+  if(a===undefined||a===null)return undefined;
+  if(a==='na')return 'N/A';
+  if(c.type==='scale')return Number(a);
+  return a==='yes'?'ДА':'НЕТ';
+}
+function apiVal(c,v){
+  if(v==='N/A')return 'na';
+  if(c.type==='scale')return String(Number(v));
+  return v==='ДА'?'yes':'no';
+}
+function allowed(c){
+  let o=c.type==='scale'?scaleVals(c).slice().sort((a,b)=>b-a):['ДА','НЕТ'];
+  if(c.type!=='flag'&&c.na_allowed)o.push('N/A');
+  return o;
+}
+function fraction(c,v){
+  if(c.type==='binary')return v==='ДА'?1:0;
+  if(c.type==='scale'){const m=scaleMax(c);return m>0?Math.min(Math.max(Number(v)/m,0),1):0;}
+  return 0;
+}
+const scoreCls=s=>s>=85?'hi':s>=60?'mid':'lo';
+function valCls(c,v){
+  if(v===undefined||v===null)return 'gray';
+  if(v==='N/A')return 'warn';
+  if(c.type==='flag')return v==='ДА'?'err':'ok';
+  if(c.type==='binary')return v==='ДА'?'ok':'err';
+  const fr=fraction(c,v);return fr>=0.75?'ok':fr>=0.4?'warn':'err';
+}
+function valBadge(c,v){
+  if(v===undefined||v===null)return '<span class="b gray">не оценено</span>';
+  if(v==='N/A')return '<span class="b warn">N/A</span>';
+  if(c.type==='scale')return '<span class="b '+valCls(c,v)+'">'+esc(v)+' / '+scaleMax(c)+'</span>';
+  return '<span class="b '+valCls(c,v)+'">'+esc(v)+'</span>';
+}
+function plainVal(c,v){
+  if(v===undefined||v===null)return 'не оценено';
+  if(c.type==='scale'&&v!=='N/A')return v+' из '+scaleMax(c);
+  return String(v);
+}
+const critNo=(cl,id)=>{const i=cl.criteria.findIndex(c=>c.id===id);return i<0?'??':pad(i+1);};
+
+/* =====================================================================
+   ИКОНКИ И МЕЛОЧИ
+===================================================================== */
+const ICON={
+  chat:'<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M2 3h12v8H7l-3.5 3v-3H2z"/></svg>',
+  call:'<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M3.5 2h2.5l1 3-1.6 1.1a8 8 0 003.5 3.5L10 8l3 1v2.5c0 1-1 2-2.2 2C6 13.5 2.5 8.3 2.5 4.2 2.5 3 3 2 3.5 2z"/></svg>'
+};
+const chan=x=>(x||'').indexOf('voice')>=0||x==='call'?'call':'chat';
+const CHEV='<svg class="chev" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 2l4 4-4 4"/></svg>';
+const statusBadge=s=>s==='Оценено'?'<span class="b ok">Оценено</span>':s==='Апелляция'?'<span class="b warn">Апелляция</span>':s==='Пересмотрено'?'<span class="b info">Пересмотрено</span>':'<span class="b gray">Не оценено</span>';
+
+/* =====================================================================
+   ЗАГРУЗКА ДАННЫХ
+===================================================================== */
+async function loadHealth(){
+  try{
+    state.health=await api('/health');
+    $('#tabsNote').innerHTML=state.health.llm_configured
+      ?'Оценка ИИ на сервере · модель <b>'+esc(state.health.model)+'</b>'+(state.health.samples>1?' · '+state.health.samples+' прогона на критерий':'')
+      :'<span style="color:var(--err)">LLM не настроена: задайте OPENAI_API_KEY в .env</span>';
+  }catch(e){$('#tabsNote').innerHTML='<span style="color:var(--err)">Сервер оценки недоступен</span>';}
+}
+async function loadChecklist(){
+  const list=await api('/checklists');
+  state.checklist=list.find(c=>c.active)||list[0];
+  $('#clVersion').textContent=state.checklist.name+' · v'+state.checklist.version;
+}
+async function loadList(){
+  const [items,ds]=await Promise.all([api('/conversations'),api('/datasets')]);
+  state.list=items;state.datasets=ds;
+  if(state.filters.dataset!=='all'&&ds.indexOf(state.filters.dataset)<0)state.filters.dataset='all';
+  $('#envPill').textContent=state.filters.dataset==='all'?(ds.join(' · ')||'нет данных'):state.filters.dataset;
+  renderFilters();renderList();renderListActions();
+}
+async function loadDetail(id){
+  const [d,g]=await Promise.all([api('/conversations/'+encodeURIComponent(id)),api('/gold/'+encodeURIComponent(id)).catch(()=>null)]);
+  if(state.selectedId!==id)return;
+  state.detail=d;state.gold=g;
+}
+
+/* =====================================================================
+   РЕНДЕР: ФИЛЬТРЫ И СПИСОК
+===================================================================== */
+function filterDefs(){
+  return [
+    {key:'dataset',label:'Набор (Group ID)',opts:[['all','Все']].concat(state.datasets.map(d=>[d,d]))},
+    {key:'channel',label:'Канал',opts:[['all','Все'],['chat','Чат'],['call','Звонок']]},
+    {key:'lang',label:'Язык',opts:[['all','Все'],['RU','RU'],['KZ','KZ'],['EN','EN']]},
+    {key:'status',label:'Статус',opts:[['all','Все'],['Не оценено','Не оценено'],['Оценено','Оценено'],['Апелляция','Апелляция'],['Пересмотрено','Пересмотрено']]}
+  ];
+}
+function renderFilters(){
+  $('#filters').innerHTML=filterDefs().map(f=>
+    '<div class="fgroup"><div class="flabel">'+f.label+'</div><div class="chips">'+
+    f.opts.map(o=>'<button class="chip'+(state.filters[f.key]===o[0]?' on':'')+'" data-f="'+f.key+'" data-v="'+esc(o[0])+'">'+esc(o[1])+'</button>').join('')+
+    '</div></div>').join('');
+}
+function filtered(){
+  const f=state.filters;
+  return state.list.filter(d=>(f.dataset==='all'||d.dataset===f.dataset)&&(f.channel==='all'||chan(d.channel)===f.channel)&&(f.lang==='all'||d.language===f.lang)&&(f.status==='all'||d.status===f.status));
+}
+function renderListActions(){
+  const list=filtered();
+  const cl=state.checklist;
+  const missing=list.filter(d=>!d.evaluation||d.evaluation.stale).length;
+  let html='<button class="btn sm primary" id="btnEvalMissing"'+(missing&&!state.job?'':' disabled')+' title="Оценить диалоги без оценки или оценённые старой версией чек-листа">Оценить ИИ: '+missing+'</button>'+
+    '<button class="btn sm" id="btnEvalAll"'+(list.length&&!state.job?'':' disabled')+' title="Заново прогнать ИИ по всем показанным диалогам">Переоценить все ('+list.length+')</button>'+
+    '<a class="btn sm" style="line-height:24px;text-decoration:none" href="'+API+'/export'+(state.filters.dataset!=='all'?'?dataset='+encodeURIComponent(state.filters.dataset):'')+'" target="_blank">Экспорт</a>';
+  if(state.job){
+    const j=state.job;
+    html+='<div class="prog"><span class="spin"></span><span>'+j.done+' / '+j.total+' · вызовов ИИ '+j.llm_calls+' · $'+j.cost_usd.toFixed(3)+'</span><div class="bar"><div style="width:'+(j.total?j.done/j.total*100:0)+'%"></div></div></div>';
+  }
+  $('#listActions').innerHTML=html;
+}
+function renderList(){
+  const list=filtered();
+  const done=list.filter(d=>d.evaluation);
+  const avg=done.length?done.reduce((s,d)=>s+(d.evaluation.total||0),0)/done.length:null;
+  $('#listMeta').textContent='Показано '+list.length+' из '+state.list.length+' · оценено '+done.length+(avg!==null?' · средний балл '+fmt(avg):'');
+  if(!state.list.length){$('#dlgList').innerHTML='<div class="empty">Диалогов нет. Введите Group ID (например, <b>DEV</b>) и нажмите «Загрузить с сервера».</div>';return;}
+  if(!list.length){$('#dlgList').innerHTML='<div class="empty">Нет диалогов по выбранным фильтрам</div>';return;}
+  const cl=state.checklist;
+  $('#dlgList').innerHTML=list.map(d=>{
+    const ev=d.evaluation,ch=chan(d.channel);
+    const fin=ev?ev.total:null,ai=ev?ev.original_total:null;
+    const changed=ev&&fin!==null&&ai!==null&&Math.abs(fin-ai)>0.004;
+    const dots=ev?'<div class="dots">'+cl.criteria.map(c=>{
+      const v=uiVal(c,ev.answers[c.id]);const k=v===undefined?'':v==='N/A'?'na':valCls(c,v);
+      return '<span class="dot '+k+'" title="'+esc(c.name)+': '+esc(plainVal(c,v))+'"></span>';}).join('')+'</div>':'';
+    return '<div class="li'+(d.conversation_id===state.selectedId?' sel':'')+'" data-id="'+esc(d.conversation_id)+'" tabindex="0">'+
+      '<div class="li-top"><span class="ico">'+ICON[ch]+'</span><b>'+esc(d.conversation_id)+'</b>'+
+        (state.evaluating.has(d.conversation_id)?'<span class="spin"></span>':ev?'<span class="sc-pill '+scoreCls(fin)+'">'+fmt(fin)+'</span>':'')+'</div>'+
+      '<div class="li-meta">'+esc(d.dataset)+' · '+d.messages+' сообщ.'+(d.has_audio?' · запись':'')+'</div>'+
+      '<div class="li-badges"><span class="b lang">'+esc(d.language||'')+'</span><span class="b lang">'+(ch==='chat'?'Чат':'Звонок')+'</span>'+statusBadge(d.status)+
+        (ev&&ev.gross_error?'<span class="b err">Грубая ошибка</span>':'')+(ev&&ev.stale?'<span class="b gray" title="Оценено прошлой версией чек-листа">стар. чек-лист</span>':'')+
+        (ev&&ev.errors&&ev.errors.length?'<span class="b err">сбой ИИ</span>':'')+'</div>'+
+      dots+(changed?'<div class="was">ИИ '+fmt(ai)+' → финал '+fmt(fin)+'</div>':'')+
+    '</div>';
+  }).join('');
+}
+
+/* =====================================================================
+   РЕНДЕР: ТРАНСКРИПТ + АУДИО
+===================================================================== */
+function speakerLabel(m){return m.speaker==='operator'?'Оператор':m.speaker==='client'?'Клиент':m.speaker==='bot'?'Бот':'Система';}
+function renderTranscript(){
+  const d=state.detail,pane=$('#transcriptPane');
+  if(state.audioEl){try{state.audioEl.pause();}catch(e){}state.audioEl=null;}
+  if(!d){pane.innerHTML='<div class="empty">Выберите диалог в списке слева</div>';return;}
+  const ch=chan(d.channel),last=d.messages[d.messages.length-1];
+  let html='<div class="t-head"><h2>'+ICON[ch].replace('width="16" height="16"','width="18" height="18" style="vertical-align:-3px;color:var(--g700)"')+' '+esc(d.conversation_id)+'</h2>'+
+    '<div class="t-sub"><span class="b lang">'+esc(d.language||'')+'</span><span>Набор: <b>'+esc(d.dataset)+'</b></span><span>'+(ch==='chat'?'Чат':'Звонок')+'</span><span>'+d.messages.length+' сообщений</span><span>Длительность: '+esc(last?last.clock:'—')+'</span></div></div>';
+  if(d.has_audio){
+    html+='<div class="audio"><audio id="audioEl" controls preload="metadata" src="'+API+'/conversations/'+encodeURIComponent(d.conversation_id)+'/audio"></audio>'+
+      '<div class="a-row"><button class="btn sm" id="aBack">⏪ −5 с</button><button class="btn sm primary" id="aPlay">▶ Воспроизвести</button><button class="btn sm" id="aFwd">+5 с ⏩</button>'+
+      '<select id="aSpeed" aria-label="Скорость"><option value="1">1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="2">2×</option></select>'+
+      '<a class="src" href="'+esc(d.audio_page)+'" target="_blank" title="Плеер организаторов">Запись звонка · позиции реплик учитывают паузы записи</a></div></div>';
+  }
+  html+='<div class="t-scroll" id="tScroll">'+d.messages.map(m=>
+    '<div class="msg '+esc(m.speaker)+'" id="msg-'+m.id+'"><div class="bubble"><div class="m-head"><span><span class="mid">'+m.id+'</span>'+esc(speakerLabel(m))+'</span>'+
+    '<button class="t" data-mid="'+m.id+'" title="'+esc(m.ts)+(m.audio_sec!=null?' · в записи '+fmtSec(m.audio_sec):'')+'">'+esc(m.clock)+(d.has_audio&&m.audio_sec!=null?' ▶':'')+'</button></div><div class="m-text">'+esc(m.text)+'</div></div></div>'
+  ).join('')+'</div>';
+  pane.innerHTML=html;
+  pane.style.display='contents';
+  if(d.has_audio)bindAudio(d);
+}
+function bindAudio(d){
+  const a=$('#audioEl');state.audioEl=a;
+  const play=$('#aPlay');
+  a.addEventListener('play',()=>{play.textContent='⏸ Пауза';});
+  a.addEventListener('pause',()=>{play.textContent='▶ Воспроизвести';});
+  a.addEventListener('error',()=>toast('Не удалось загрузить запись звонка','err'));
+  a.addEventListener('timeupdate',()=>{
+    const t=a.currentTime;let c=null;
+    d.messages.forEach(m=>{if(m.audio_sec!=null&&m.audio_sec<=t&&m.speaker!=='system')c=m;});
+    $$('.msg.playing').forEach(x=>x.classList.remove('playing'));
+    if(c){const el=document.getElementById('msg-'+c.id);if(el)el.classList.add('playing');}
+  });
+  play.addEventListener('click',()=>{a.paused?a.play().catch(e=>toast('Воспроизведение: '+e.message,'err')):a.pause();});
+  $('#aBack').addEventListener('click',()=>{a.currentTime=Math.max(0,a.currentTime-5);});
+  $('#aFwd').addEventListener('click',()=>{a.currentTime=Math.min(a.duration||1e9,a.currentTime+5);});
+  $('#aSpeed').addEventListener('change',e=>{a.playbackRate=Number(e.target.value);});
+}
+function msgById(id){return state.detail&&state.detail.messages.find(m=>m.id===id);}
+function goToMsg(id,range){
+  $$('.msg.inrange').forEach(x=>x.classList.remove('inrange'));
+  if(range&&state.detail){
+    const ids=state.detail.messages.map(m=>m.id);
+    let a=ids.indexOf(range[0]),b=ids.indexOf(range[1]);if(a>b){const t=a;a=b;b=t;}
+    for(let i=a;i>=0&&i<=b;i++){const el=document.getElementById('msg-'+ids[i]);if(el)el.classList.add('inrange');}
+  }
+  const el=document.getElementById('msg-'+id);
+  if(!el){toast('Реплика '+id+' не найдена в транскрипте','warn');return;}
+  el.scrollIntoView({behavior:'smooth',block:'center'});
+  el.classList.remove('hl');void el.offsetWidth;el.classList.add('hl');
+  setTimeout(()=>el.classList.remove('hl'),2800);
+  const m=msgById(id);
+  if(state.audioEl&&m&&m.audio_sec!=null){try{state.audioEl.currentTime=Math.max(0,m.audio_sec-1);}catch(e){}}
+}
+function evChips(list){
+  return (list||[]).map(e=>{
+    const m=msgById(e.msg_id);
+    const snip=e.quote||(m?m.text:'');
+    return '<button class="ev" data-mid="'+esc(e.msg_id)+'" title="'+esc((e.why?e.why+' — ':'')+'перейти к реплике')+'"><span class="tm">▶ '+esc(m?m.clock:e.msg_id)+'</span><span class="snip">'+esc(snip.slice(0,80))+'</span></button>';
+  }).join('');
+}
+
+/* =====================================================================
+   РЕНДЕР: КАРТОЧКА СКОРИНГА
+===================================================================== */
+function ring(score){
+  const s=score===null||score===undefined?0:score;
+  const C=2*Math.PI*52,off=C*(1-s/100);
+  return '<div class="ring '+scoreCls(s)+'"><svg viewBox="0 0 120 120"><circle class="bg" cx="60" cy="60" r="52"/><circle class="fg" cx="60" cy="60" r="52" stroke-dasharray="'+C.toFixed(2)+'" stroke-dashoffset="'+off.toFixed(2)+'" transform="rotate(-90 60 60)"/></svg><div class="ring-num"><b>'+fmt(score)+'</b><span>из 100</span></div></div>';
+}
+function appealsFor(ev,cid){return (state.detail.appeals||[]).filter(a=>a.evaluation_id===ev.id&&a.criterion_id===cid);}
+function lastDecision(ev,cid){const ds=(ev.decisions||[]).filter(x=>x.criterion_id===cid);return ds[ds.length-1];}
+
+function critItem(ev,c,i){
+  const cl=ev.checklist_snapshot;
+  const item=ev.criteria.find(x=>x.criterion_id===c.id)||{};
+  const si=(ev.final_score.items||[]).find(x=>x.criterion_id===c.id)||{};
+  const v=uiVal(c,ev.final_answers[c.id]),aiV=uiVal(c,ev.original_answers[c.id]);
+  const aps=appealsFor(ev,c.id),ap=aps[aps.length-1],rev=lastDecision(ev,c.id);
+  const key=ev.conversation_id+':'+c.id,open=state.open.has(key);
+  const openAppeal=ap&&ap.status==='open';
+  const appBadge=!ap?'':ap.status==='open'?'<span class="b warn">Апелляция</span>':ap.status==='changed'?'<span class="b ok">Апелляция удовл.</span>':'<span class="b gray">Апелляция отклонена</span>';
+  const canAppeal=state.role==='operator'&&!openAppeal&&v!==undefined;
+  const sumW=ev.final_score.applicable_weight;
+
+  let calc;
+  if(c.type==='flag')calc='Критерий без веса — отдельный флаг тревоги, на итоговый балл не влияет.';
+  else if(v===undefined)calc='Значение не выставлено — критерий исключён из расчёта.';
+  else if(v==='N/A')calc='N/A — вес '+c.weight+' исключён из знаменателя и перераспределён между активными критериями.';
+  else{
+    const fr=fraction(c,v);
+    const form=c.type==='scale'?'('+v+' / '+scaleMax(c)+') × '+c.weight:(v==='ДА'?'ДА = 100% веса: ':'НЕТ = 0: ')+fr*100+'% × '+c.weight;
+    calc='Базово: '+form+' = <b>'+fmt(si.raw_points)+'</b> из '+c.weight+'<br>С перераспределением (Σ активных весов = '+round2(sumW)+'): вес '+c.weight+' → <b>'+fmt(si.effective_weight)+'</b>, вклад <b>'+fmt(si.points)+'</b> из '+fmt(si.effective_weight);
+  }
+  const scaleTxt=c.type==='scale'?'Шкала: '+scaleVals(c).join(' · ')+(c.na_allowed?' · N/A':''):c.type==='binary'?'Шкала: ДА / НЕТ'+(c.na_allowed?' / N/A':''):'Флаг: ДА / НЕТ';
+  const naRule=c.type==='flag'?'Не применяется':(c.na_allowed?(c.na_condition||'N/A допустим'):'N/A запрещён');
+
+  let body='<div class="kv"><div class="k">Параметры</div><div>Базовый вес: <b>'+(c.type==='flag'?'—':c.weight)+'</b> · '+esc(scaleTxt)+'<br><span style="color:var(--n80)">Правило: '+esc(c.rule)+'<br>Правило N/A: '+esc(naRule)+'</span></div></div>'+
+    '<div class="kv"><div class="k">Обоснование ИИ'+(item.reused?' <span class="b gray" title="Критерий не менялся — ответ взят из прошлой оценки без нового вызова модели">из прошлой оценки</span>':'')+
+      (item.confidence==='low'?' <span class="b warn" title="Модель не уверена — стоит проверить">низкая уверенность</span>':'')+'</div><div>'+valBadge(c,aiV)+' '+esc(item.rationale||'')+'</div>'+
+      (item.error?'<div class="warnline">⚠ Сбой ИИ: '+esc(item.error)+'</div>':'')+'</div>';
+  if((item.evidence&&item.evidence.length)||item.checked_range){
+    body+='<div class="kv"><div class="k">Доказательства в диалоге</div><div>'+evChips(item.evidence)+
+      (item.checked_range?'<button class="ev range" data-mid="'+esc(item.checked_range.from_msg)+'" data-range="'+esc(item.checked_range.from_msg+','+item.checked_range.to_msg)+'" title="Участок, где ИИ искал действие"><span class="tm">⇕ '+esc((msgById(item.checked_range.from_msg)||{}).clock||'')+'–'+esc((msgById(item.checked_range.to_msg)||{}).clock||'')+'</span><span class="snip">проверенный участок разговора</span></button>':'')+'</div></div>';
+  }
+  if(item.analysis)body+='<details class="reason"><summary>Ход рассуждения модели</summary><p>'+esc(item.analysis)+'</p></details>';
+  if(item.votes)body+='<div class="kv"><div class="k">Голоса прогонов</div><div>'+Object.entries(item.votes).map(([k,n])=>valBadge(c,uiVal(c,k))+'×'+n).join(' ')+'</div></div>';
+  body+='<div class="kv"><div class="k">Расчёт</div><div class="calc">'+calc+'</div></div>';
+  aps.forEach(a=>{
+    body+='<div class="box appeal"><div class="h">Апелляция оператора · '+fmtDate(a.created_at)+' '+(a.status==='open'?'<span class="b warn">ждёт решения</span>':'')+'</div>'+esc(a.data.comment)+
+      (a.data.requested_answer?'<br><span style="color:var(--n80)">Просит: '+esc(plainVal(c,uiVal(c,a.data.requested_answer)))+'</span>':'')+'</div>';
+  });
+  if(rev)body+='<div class="box review"><div class="h">Пересмотр · '+esc(rev.reviewer||'Супервизор')+' · '+fmtDate(rev.at)+'</div>'+
+    (rev.from===rev.to?'Оценка оставлена без изменений: <b>'+esc(plainVal(c,uiVal(c,rev.to)))+'</b>':'ИИ: <b>'+esc(plainVal(c,aiV))+'</b> → супервизор: <b>'+esc(plainVal(c,uiVal(c,rev.to)))+'</b>')+
+    '<br>'+esc(rev.reason)+(rev.total_before!=null?'<br><span style="color:var(--n80)">Итог: '+fmt(rev.total_before)+' → '+fmt(rev.total_after)+'</span>':'')+'</div>';
+  if(state.role==='supervisor'){
+    body+='<div class="rev-form" data-cid="'+c.id+'"><div class="k" style="font-size:11px;font-weight:700;color:var(--n80);text-transform:uppercase;margin-bottom:6px">Блок ревьюера (супервизор)</div>'+
+      '<label>Новая оценка<select class="rev-val">'+allowed(c).map(o=>'<option value="'+esc(o)+'"'+(String(o)===String(v)?' selected':'')+'>'+esc(o)+'</option>').join('')+'</select></label>'+
+      '<label>Обоснование пересмотра<textarea class="rev-reason" placeholder="'+(openAppeal?'Решение по апелляции: почему принимаете или отклоняете…':'Почему оценка меняется…')+'"></textarea></label>'+
+      '<button class="btn primary sm save-verdict">Сохранить вердикт</button>'+
+      (openAppeal?' <span style="font-size:11px;color:var(--n80)">Совпадает с текущей — апелляция будет отклонена</span>':'')+'</div>';
+  }
+  if(state.labelMode){
+    const g=state.gold&&state.gold.answers?state.gold.answers[c.id]:undefined;
+    body+='<div class="gold-row">Эталон для замера точности: <select class="gold-val" data-cid="'+c.id+'"><option value="">—</option>'+
+      allowed(c).map(o=>{const a=apiVal(c,o);return '<option value="'+esc(a)+'"'+(g===a?' selected':'')+'>'+esc(o)+'</option>';}).join('')+'</select>'+
+      (g!==undefined?(g===ev.original_answers[c.id]?'<span class="b ok">ИИ совпал</span>':'<span class="b err">ИИ ошибся</span>'):'')+'</div>';
+  }
+
+  const revChanged=rev&&rev.from!==rev.to&&v!==aiV;
+  const effTag=c.type==='flag'?'флаг':'вес '+c.weight+(si.effective_weight&&Math.abs(si.effective_weight-c.weight)>0.004?' → '+fmt(si.effective_weight):'');
+  return '<div class="acc'+(open?' open':'')+(openAppeal?' has-appeal':'')+'" data-key="'+esc(key)+'">'+
+    '<div class="acc-head" role="button" tabindex="0" aria-expanded="'+open+'">'+CHEV+
+      '<span class="code">'+pad(i+1)+'</span><span class="cname">'+esc(c.name)+'</span>'+
+      '<span class="acc-right"><span class="wtag">'+effTag+'</span>'+
+      valBadge(c,v)+(revChanged?'<span class="b gray" title="Оценка изменена супервизором">пересм.</span>':'')+appBadge+
+      (item.confidence==='low'?'<span class="b warn" title="Низкая уверенность модели">?</span>':'')+
+      (canAppeal?'<button class="btn sm danger btn-appeal" data-cid="'+c.id+'">Оспорить</button>':'')+
+      '</span></div>'+
+    '<div class="acc-body">'+body+'</div></div>';
+}
+function historyItems(d){
+  const items=[];
+  (d.history||[]).slice().reverse().forEach((h,i)=>{
+    items.push({at:h.created_at,html:'<b>'+(i===0?'Оценка ИИ':'Переоценка ИИ')+': '+fmt(h.ai_total)+'</b>'+(h.previous_total!=null?' (финал был '+fmt(h.previous_total)+')':'')+
+      '<br><span class="when">'+fmtDate(h.created_at)+' · '+esc(h.model||'ИИ')+' · чек-лист v'+h.checklist_version+' · вызовов модели: '+(h.llm_calls||0)+(h.reused&&h.reused.length?' · без изменений: '+h.reused.length+' крит.':'')+'</span>'});
+  });
+  const ev=d.evaluation,cl=ev?ev.checklist_snapshot:state.checklist;
+  (d.appeals||[]).forEach(a=>{
+    const c=cl.criteria.find(x=>x.id===a.criterion_id);
+    items.push({at:a.created_at,html:'<b>Апелляция</b> — '+critNo(cl,a.criterion_id)+'. '+esc(c?c.name:a.criterion_id)+'<br><span class="when">'+fmtDate(a.created_at)+' · '+esc(a.data.author||'Оператор')+'</span>'});
+  });
+  if(ev)(ev.decisions||[]).forEach(x=>{
+    const c=cl.criteria.find(y=>y.id===x.criterion_id);
+    items.push({at:x.at,html:'<b>Пересмотр: ['+fmt(x.total_before)+'] → ['+fmt(x.total_after)+']</b><br>'+critNo(cl,x.criterion_id)+'. '+esc(c?c.name:x.criterion_id)+': '+
+      (x.from===x.to?'апелляция отклонена, оценка '+esc(plainVal(c,uiVal(c,x.to)))+' сохранена':esc(plainVal(c,uiVal(c,x.from)))+' → '+esc(plainVal(c,uiVal(c,x.to))))+
+      '<br><span class="when">'+fmtDate(x.at)+' · '+esc(x.reviewer||'Супервизор')+'</span>'});
+  });
+  return items.sort((a,b)=>String(b.at).localeCompare(String(a.at)));
+}
+function renderScorecard(){
+  const el=$('#scorePane'),d=state.detail;
+  if(!d){el.innerHTML='<div class="empty">Выберите диалог</div>';return;}
+  const ev=d.evaluation;
+  const evaluating=state.evaluating.has(d.conversation_id);
+  const evalBtn='<button class="btn sm primary" id="btnEvalOne"'+(evaluating||!state.health||!state.health.llm_configured?' disabled':'')+'>'+(evaluating?'<span class="spin"></span> ИИ оценивает…':ev?'Переоценить ИИ':'Оценить ИИ')+'</button>';
+  if(!ev){
+    el.innerHTML='<div class="sc-head">'+ring(null)+'<div class="sc-meta"><div class="ttl">Диалог ещё не оценён</div><div>ИИ проверит работу оператора по '+state.checklist.criteria.length+' критериям активного чек-листа (v'+state.checklist.version+').</div><div class="sc-actions">'+evalBtn+'</div></div></div>';
+    return;
+  }
+  const cl=ev.checklist_snapshot,fs=ev.final_score,os=ev.original_score;
+  const delta=(fs.total||0)-(os.total||0),changed=Math.abs(delta)>0.004;
+  const naN=cl.criteria.filter(c=>c.type!=='flag'&&ev.final_answers[c.id]==='na').length;
+  const stale=state.checklist&&(state.checklist.id!==ev.checklist_id||state.checklist.version!==ev.checklist_version);
+  const gc=cl.criteria.find(c=>c.type==='flag');
+  let gross='';
+  if(fs.gross_error&&gc){
+    const gi=ev.criteria.find(x=>x.criterion_id===gc.id)||{};const gr=lastDecision(ev,gc.id);
+    gross='<div class="gross-banner"><b>⚠ КРИТИЧЕСКОЕ НАРУШЕНИЕ · '+esc(gc.name)+': ДА</b>'+esc(gr&&gr.to==='yes'?gr.reason:gi.rationale)+
+      '<div style="margin-top:6px">'+evChips(gi.evidence)+'</div></div>';
+  }
+  const hint=state.role==='operator'
+    ?'Роль «Оператор»: нажмите «Оспорить» возле критерия, чтобы подать апелляцию. Для пересмотра переключитесь на роль «Супервизор».'
+    :'Роль «Супервизор»: раскройте критерий, чтобы изменить оценку или отклонить апелляцию. Итог пересчитывается на сервере.';
+  el.innerHTML=
+    '<div class="sc-head">'+ring(fs.total)+
+      '<div class="sc-meta"><div class="ttl">Итоговый балл</div>'+
+      '<div class="flow">'+(changed?'ИИ ['+fmt(os.total)+'] <span class="arrow">→</span> финал ['+fmt(fs.total)+'] <span class="'+(delta>0?'up':'down')+'">'+(delta>0?'+':'')+fmt(delta)+'</span>':'Оценка ИИ без пересмотра')+'</div>'+
+      '<div class="sc-badges">'+(fs.gross_error?'<span class="b err">Грубая ошибка: ДА</span>':'<span class="b ok">Грубая ошибка: НЕТ</span>')+statusBadge(statusOf(d))+'</div>'+
+      '<div>Σ активных весов: <b>'+round2(fs.applicable_weight)+'</b>'+(naN?' · N/A: <b>'+naN+'</b> (вес перераспределён)':'')+'</div>'+
+      '<div class="aimeta">Модель '+esc(ev.model)+' · вызовов '+ev.llm_calls+' · '+(ev.usage.input+ev.usage.output)+' токенов · ≈$'+(ev.cost_usd||0).toFixed(4)+' · '+ev.duration_s+' с · чек-лист v'+ev.checklist_version+'</div>'+
+      '<div class="sc-actions">'+evalBtn+'</div></div></div>'+
+    (fs.sections&&fs.sections.length?'<div class="sections">'+fs.sections.map(s=>'<div class="secbox"><div class="n">'+esc(s.name)+'</div><div class="v">'+(s.points==null?'N/A':fmt(s.points)+' <span style="font-weight:400;color:var(--n80);font-size:11px">/ '+fmt(s.max_points)+'</span>')+'</div><div class="bar"><div style="width:'+(s.percent||0)+'%"></div></div></div>').join('')+'</div>':'')+
+    (stale?'<div class="notice warn">Оценено версией чек-листа v'+ev.checklist_version+', активна v'+state.checklist.version+'. Нажмите «Переоценить ИИ» — изменённые критерии будут оценены заново.</div>':'')+
+    (ev.errors&&ev.errors.length?'<div class="notice warn">ИИ не смог оценить: '+ev.errors.map(id=>esc((cl.criteria.find(c=>c.id===id)||{}).name||id)).join(', ')+'. Попробуйте переоценить.</div>':'')+
+    gross+
+    '<div class="role-hint">'+hint+'</div>'+
+    '<div class="acc-tools"><span class="pane-title" style="margin:0">Критерии чек-листа</span><span><label style="font-size:12px;color:var(--n80);margin-right:8px"><input type="checkbox" id="labelMode"'+(state.labelMode?' checked':'')+'> разметка эталона</label><button class="linkbtn" data-act="expand">Развернуть все</button> · <button class="linkbtn" data-act="collapse">Свернуть все</button></span></div>'+
+    cl.criteria.map((c,i)=>critItem(ev,c,i)).join('')+
+    '<div class="hist"><h4>История баллов</h4><ul>'+historyItems(d).map(h=>'<li>'+h.html+'</li>').join('')+'</ul></div>';
+}
+function statusOf(d){
+  if(!d.evaluation)return 'Не оценено';
+  if((d.appeals||[]).some(a=>a.status==='open'&&a.evaluation_id===d.evaluation.id))return 'Апелляция';
+  if((d.evaluation.decisions||[]).length)return 'Пересмотрено';
+  return 'Оценено';
+}
+
+/* =====================================================================
+   РЕНДЕР: НАСТРОЙКИ ЧЕК-ЛИСТА
+===================================================================== */
+function scaleToText(c){return (c.scale||[]).map(s=>s.value).join(', ');}
+function parseScale(str){
+  const parts=String(str).split(/[,;\s]+/).filter(Boolean);
+  if(parts.length<2)return null;
+  const nums=parts.map(Number);
+  if(nums.some(n=>!Number.isFinite(n)||n<0))return null;
+  const u=Array.from(new Set(nums)).sort((a,b)=>b-a);
+  if(u.length<2||u[0]<=0)return null;
+  return u;
+}
+function renderSettings(){
+  const d=state.draft;if(!d)return;
+  const secs=d.sections||[];
+  $('#setBody').innerHTML=d.criteria.map((c,i)=>{
+    let typeCell;
+    if(c.type==='flag')typeCell='<span class="b err">Флаг тревоги (без веса)</span>';
+    else typeCell='<div class="typecell"><select class="in-type"><option value="binary"'+(c.type==='binary'?' selected':'')+'>ДА / НЕТ</option><option value="scale"'+(c.type==='scale'?' selected':'')+'>Шкала</option></select>'+
+      (c.type==='scale'?'<input type="text" class="in-scale'+(c._scaleBad?' bad':'')+'" value="'+esc(c._scaleRaw!=null?c._scaleRaw:scaleToText(c))+'" placeholder="0, 5, 10" title="Ступени шкалы через запятую">':'')+'</div>';
+    const openD=c._open;
+    let row='<tr data-id="'+esc(c.id)+'"><td class="num">'+pad(i+1)+'</td>'+
+      '<td><input type="text" class="in-name" value="'+esc(c.name)+'" placeholder="Формулировка критерия"></td>'+
+      '<td>'+typeCell+'</td>'+
+      '<td>'+(c.type==='flag'?'—':'<input type="number" class="in-w" min="0" max="100" step="0.5" value="'+(Number.isFinite(c.weight)?c.weight:'')+'">')+'</td>'+
+      '<td>'+(c.type==='flag'?'—':'<label class="switch"><input type="checkbox" class="in-na"'+(c.na_allowed?' checked':'')+'><span></span></label>')+'</td>'+
+      '<td><button class="btn sm tgl-detail">'+(openD?'Скрыть':'Правила ▸')+'</button></td>'+
+      '<td>'+(c.type==='flag'?'<span style="color:var(--n80);font-size:12px">системный</span>':'<button class="btn sm danger del">Удалить</button>')+'</td></tr>';
+    if(openD){
+      row+='<tr class="detail-row" data-id="'+esc(c.id)+'"><td></td><td colspan="6"><div class="detail-grid">'+
+        '<label class="full">Правило «Да» / как ставить балл — ИИ оценивает именно по нему<textarea class="in-rule">'+esc(c.rule||'')+'</textarea></label>'+
+        (c.na_allowed?'<label>Когда ставить N/A<textarea class="in-nacond">'+esc(c.na_condition||'')+'</textarea></label>':'')+
+        '<label'+(c.na_allowed?'':' class="full"')+'>Уточнения для ИИ (необязательно)<textarea class="in-guide">'+esc(c.guidance||'')+'</textarea></label>'+
+        (c.type==='scale'?'<label class="full">Описание ступеней шкалы (по строке: «значение — описание»)<textarea class="in-steps" rows="5">'+esc((c.scale||[]).map(s=>s.value+' — '+(s.label||'')).join('\n'))+'</textarea></label>':'')+
+        '<label>Секция<select class="in-sec">'+secs.map(s=>'<option value="'+esc(s.id)+'"'+(s.id===c.section?' selected':'')+'>'+esc(s.name)+'</option>').join('')+'</select></label>'+
+        '<label>ID критерия<textarea class="in-id" style="min-height:30px" rows="1"'+(c._isNew?'':' disabled')+'>'+esc(c.id)+'</textarea></label>'+
+      '</div></td></tr>';
+    }
+    return row;
+  }).join('');
+  updateSum();
+}
+function validateDraft(){
+  const errs=[];const ids=new Set();
+  state.draft.criteria.forEach((c,i)=>{
+    const n=pad(i+1);
+    if(!c.name.trim())errs.push('Критерий '+n+': пустая формулировка');
+    if(!String(c.rule||'').trim())errs.push('Критерий '+n+': пустое правило для ИИ (раскройте «Правила»)');
+    if(ids.has(c.id))errs.push('Критерий '+n+': повторяющийся ID '+c.id);ids.add(c.id);
+    if(c.type!=='flag'){
+      if(!Number.isFinite(c.weight)||c.weight<0||c.weight>100)errs.push('Критерий '+n+': вес должен быть числом от 0 до 100');
+      if(c.type==='scale'&&(c._scaleBad||!c.scale||c.scale.length<2))errs.push('Критерий '+n+': шкала — минимум 2 неотрицательных числа через запятую (максимум > 0)');
+    }
+  });
+  if(!state.draft.criteria.some(c=>c.type!=='flag'))errs.push('Нужен хотя бы один взвешенный критерий');
+  return errs;
+}
+function draftSum(){return state.draft.criteria.reduce((s,c)=>s+(c.type!=='flag'&&Number.isFinite(c.weight)?c.weight:0),0);}
+function updateSum(){
+  const sum=draftSum(),ok=Math.abs(sum-100)<=0.005;
+  const box=$('#sumBox');
+  box.className='sumbox '+(ok?'ok':'err');
+  box.textContent='Σ весов: '+fmt(sum)+' / 100'+(ok?' ✓':' ('+(sum>100?'+':'')+fmt(sum-100)+')');
+  const errs=validateDraft();
+  $('#setErrors').innerHTML=errs.map(e=>'<div>⚠ '+esc(e)+'</div>').join('');
+  $('#btnApply').disabled=!(ok&&errs.length===0)||!!state.job;
+}
+function newDraft(cl){
+  state.draft=clone(cl||state.checklist);
+  delete state.draft.version;delete state.draft.saved_at;delete state.draft.active;delete state.draft.versions;
+}
+function cleanDraft(){
+  const d=clone(state.draft);
+  d.criteria.forEach(c=>{Object.keys(c).filter(k=>k[0]==='_').forEach(k=>delete c[k]);c.name=c.name.trim();if(c.type==='flag')c.weight=0;});
+  return d;
+}
+function normalizeDraft(){
+  const w=state.draft.criteria.filter(c=>c.type!=='flag');
+  const sum=w.reduce((s,c)=>s+(Number.isFinite(c.weight)?c.weight:0),0);
+  if(sum<=0){toast('Нельзя нормализовать: сумма весов равна 0','warn');return;}
+  w.forEach(c=>{c.weight=round2((Number.isFinite(c.weight)?c.weight:0)/sum*100);});
+  const diff=round2(100-w.reduce((s,c)=>s+c.weight,0));
+  if(diff!==0){const big=w.reduce((a,b)=>b.weight>a.weight?b:a);big.weight=round2(big.weight+diff);}
+  renderSettings();toast('Веса приведены к сумме 100','ok');
+}
+async function applyConfig(){
+  const errs=validateDraft();
+  if(errs.length||Math.abs(draftSum()-100)>0.005){toast('Исправьте ошибки в настройках: сумма весов должна быть 100','err');return;}
+  const btn=$('#btnApply');busy(btn,true,'Сохраняю…');
+  try{
+    const saved=await api('/checklists',{method:'POST',body:cleanDraft()});
+    await loadChecklist();newDraft();renderSettings();
+    const ds=state.filters.dataset!=='all'?state.filters.dataset:null;
+    const ids=state.list.filter(d=>(!ds||d.dataset===ds)&&d.evaluation).map(d=>d.conversation_id);
+    toast('Сохранена версия v'+saved.version+'. Переоцениваю '+ids.length+' оценённых диалогов…','ok');
+    if(ids.length)await startJob(ids,true);
+    else{busy(btn,false);toast('Оценённых диалогов нет — новая версия будет применена при следующей оценке','info');}
+  }catch(e){busy(btn,false);toast(e.message,'err');}
+}
+
+/* =====================================================================
+   ОЦЕНКА ИИ (ОДИН ДИАЛОГ / ПАКЕТ)
+===================================================================== */
+async function evaluateOne(id){
+  if(state.evaluating.has(id))return;
+  state.evaluating.add(id);renderList();if(state.selectedId===id)renderScorecard();
+  try{
+    const ev=await api('/evaluate/'+encodeURIComponent(id)+'?fresh=true',{method:'POST'});
+    toast('ИИ оценил '+id+': '+fmt(ev.final_score.total)+' баллов · вызовов '+ev.llm_calls+' · ≈$'+ev.cost_usd.toFixed(4),'ok');
+  }catch(e){toast('Оценка '+id+': '+e.message,'err');}
+  state.evaluating.delete(id);
+  await loadList();
+  if(state.selectedId===id){await loadDetail(id);renderScorecard();}
+}
+async function startJob(ids,fromSettings){
+  if(!state.health||!state.health.llm_configured){toast('LLM не настроена на сервере','err');return;}
+  const before={};state.list.forEach(d=>{before[d.conversation_id]=d.evaluation?d.evaluation.total:null;});
+  const j=await api('/evaluate',{method:'POST',body:{conversation_ids:ids,reuse:true}});
+  if(!j.total){toast('Нечего оценивать','info');return;}
+  state.job=j;state.jobBefore=before;state.jobFromSettings=!!fromSettings;
+  renderListActions();updateSum();pollJob();
+}
+async function pollJob(){
+  if(!state.job)return;
+  try{
+    const j=await api('/jobs/'+state.job.id);
+    state.job=j;renderListActions();
+    if(j.done&&j.done%5===0)loadList();
+    if(j.status==='finished'){
+      state.job=null;busy($('#btnApply'),false);
+      await loadList();
+      if(state.selectedId){await loadDetail(state.selectedId);renderScorecard();}
+      toast('Оценка завершена: '+(j.done-j.failed.length)+' диалогов, ошибок '+j.failed.length+', вызовов ИИ '+j.llm_calls+', ≈$'+j.cost_usd.toFixed(3),j.failed.length?'warn':'ok',7000);
+      showReport(j);updateSum();
+      return;
+    }
+  }catch(e){state.job=null;busy($('#btnApply'),false);toast(e.message,'err');return;}
+  setTimeout(pollJob,1500);
+}
+function showReport(j){
+  const rows=j.results.slice().sort((a,b)=>a.conversation_id.localeCompare(b.conversation_id));
+  let changed=0;
+  $('#reportBody').innerHTML=rows.map(r=>{
+    const before=r.before!=null?r.before:(state.jobBefore||{})[r.conversation_id];
+    const dl=before==null?null:r.after-before;
+    if(dl!==null&&Math.abs(dl)>0.004)changed++;
+    const cls=dl===null||Math.abs(dl)<0.005?'zero':dl>0?'up':'down';
+    return '<tr><td><b>'+esc(r.conversation_id)+'</b></td><td>'+fmt(before)+'</td><td>'+fmt(r.ai_after)+'</td><td><b>'+fmt(r.after)+'</b></td><td class="delta '+cls+'">'+(dl===null?'новая':(dl>0.004?'+':'')+fmt(dl))+'</td></tr>';
+  }).join('');
+  $('#reportNote').textContent='Чек-лист '+j.checklist+' · переоценено диалогов: '+rows.length+' · изменился итоговый балл: '+changed+' · вызовов ИИ: '+j.llm_calls+' (неизменённые критерии взяты из прошлых оценок) · ≈$'+j.cost_usd.toFixed(3);
+  $('#reportCard').style.display='block';
+  if(state.view==='settings')$('#reportCard').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+/* =====================================================================
+   ТОЧНОСТЬ И СВОДКА
+===================================================================== */
+async function renderStats(){
+  const pane=$('#statsPane');
+  pane.innerHTML='<div class="card"><div class="empty"><span class="spin"></span> Загрузка…</div></div>';
+  const rep=await api('/gold/report').catch(()=>null);
+  const cl=state.checklist,ev=state.list.filter(d=>d.evaluation);
+  const avg=a=>a.length?a.reduce((s,x)=>s+(x||0),0)/a.length:null;
+  const byLang={};ev.forEach(d=>{(byLang[d.language]=byLang[d.language]||[]).push(d.evaluation.total);});
+  let html='<div class="card"><header><h2>Сводка по оценкам</h2><p>Активный чек-лист: '+esc(cl.name)+' v'+cl.version+'</p></header><div class="stat-grid">'+
+    '<div class="stat"><div class="n">Оценено</div><div class="v">'+ev.length+' / '+state.list.length+'</div></div>'+
+    '<div class="stat"><div class="n">Средний балл</div><div class="v">'+fmt(avg(ev.map(d=>d.evaluation.total)))+'</div></div>'+
+    Object.keys(byLang).sort().map(l=>'<div class="stat"><div class="n">'+esc(l)+'</div><div class="v">'+fmt(avg(byLang[l]))+'</div><div class="s">'+byLang[l].length+' диалогов</div></div>').join('')+
+    '<div class="stat"><div class="n">Грубые ошибки</div><div class="v">'+ev.filter(d=>d.evaluation.gross_error).length+'</div></div>'+
+    '<div class="stat"><div class="n">Апелляции</div><div class="v">'+state.list.reduce((s,d)=>s+d.open_appeals,0)+'</div><div class="s">открыто</div></div>'+
+    '</div><div class="tbl-wrap"><table class="t" style="min-width:600px"><thead><tr><th>№</th><th>Критерий</th><th>Распределение ответов ИИ</th></tr></thead><tbody>'+
+    cl.criteria.map((c,i)=>{const cnt={};ev.forEach(d=>{const a=d.evaluation.answers[c.id];if(a!==undefined)cnt[a]=(cnt[a]||0)+1;});
+      return '<tr><td class="num">'+pad(i+1)+'</td><td>'+esc(c.name)+'</td><td>'+Object.keys(cnt).map(a=>valBadge(c,uiVal(c,a))+' ×'+cnt[a]).join(' ')+'</td></tr>';}).join('')+
+    '</tbody></table></div></div>';
+  html+='<div class="card"><header><h2>Точность ИИ против эталона</h2><p>Эталон размечается в карточке диалога: включите «разметка эталона» над списком критериев. Сравниваются исходные ответы ИИ — до апелляций.</p></header>';
+  if(rep&&rep.n){
+    html+='<div class="stat-grid"><div class="stat"><div class="n">Диалогов с эталоном</div><div class="v">'+rep.n+'</div></div>'+
+      '<div class="stat"><div class="n">Совпадение ответов</div><div class="v">'+fmt(rep.answer_accuracy*100)+'%</div></div>'+
+      '<div class="stat"><div class="n">Ошибка итога (MAE)</div><div class="v">'+fmt(rep.total_mae)+'</div><div class="s">баллов из 100</div></div></div>'+
+      '<div class="tbl-wrap"><table class="t" style="min-width:600px"><thead><tr><th>Критерий</th><th>Совпадение</th><th>Расхождения (ИИ / эталон)</th></tr></thead><tbody>'+
+      rep.per_criterion.map(r=>{const c=cl.criteria.find(x=>x.id===r.id)||{type:'binary',scale:[]};
+        return '<tr><td>'+esc(r.name)+'</td><td><b>'+fmt(r.accuracy*100)+'%</b> ('+r.match+'/'+r.n+')</td><td style="font-size:12px">'+
+        r.mismatches.map(m=>'<a href="#" class="go-dlg" data-id="'+esc(m.conversation_id)+'">'+esc(m.conversation_id)+'</a>: '+esc(plainVal(c,uiVal(c,m.pred)))+' / '+esc(plainVal(c,uiVal(c,m.gold)))).join('<br>')+'</td></tr>';}).join('')+
+      '</tbody></table></div>';
+  }else html+='<div class="empty">Эталонной разметки пока нет.</div>';
+  html+='</div>';
+  pane.innerHTML=html;
+}
+
+/* =====================================================================
+   НАВИГАЦИЯ
+===================================================================== */
+async function selectDialog(id,scroll){
+  state.selectedId=id;state.detail=null;
+  renderList();
+  $('#transcriptPane').innerHTML='<div class="empty"><span class="spin"></span> Загрузка диалога…</div>';
+  $('#scorePane').innerHTML='';
+  try{await loadDetail(id);}catch(e){toast(e.message,'err');return;}
+  if(state.selectedId!==id)return;
+  renderTranscript();renderScorecard();
+  if(scroll&&window.matchMedia('(max-width:1100px)').matches)$('#colTranscript').scrollIntoView({behavior:'smooth'});
+}
+function setView(v){
+  state.view=v;
+  $$('.tab').forEach(t=>t.classList.toggle('active',t.dataset.view===v));
+  $('#viewDialogs').classList.toggle('active',v==='dialogs');
+  $('#viewSettings').classList.toggle('active',v==='settings');
+  $('#viewStats').classList.toggle('active',v==='stats');
+  if(v==='settings'){if(!state.draft)newDraft();renderSettings();}
+  if(v==='stats')renderStats();
+}
+function setRole(r){
+  state.role=r;
+  $$('#roleSeg button').forEach(b=>b.classList.toggle('on',b.dataset.role===r));
+  $('#avatar').textContent=r==='operator'?'ОП':'СВ';
+  const d=state.detail;
+  if(r==='supervisor'&&d&&d.evaluation){(d.appeals||[]).forEach(a=>{if(a.status==='open')state.open.add(d.conversation_id+':'+a.criterion_id);});}
+  renderScorecard();
+  toast('Роль: '+(r==='operator'?'Оператор (можно оспаривать оценки)':'Супервизор (можно пересматривать оценки)'),'info',2600);
+}
+async function loadFromServer(){
+  const gid=$('#groupId').value.trim();
+  if(!gid){toast('Введите Group ID','warn');$('#groupId').focus();return;}
+  const btn=$('#btnLoad');busy(btn,true,'Загрузка…');
+  try{
+    const r=await api('/datasets/fetch',{method:'POST',body:{group_id:gid}});
+    state.filters.dataset=r.dataset;
+    await loadList();
+    toast('Group ID «'+r.dataset+'»: загружено '+r.loaded+' диалогов из API. Нажмите «Оценить ИИ», чтобы запустить оценку.','ok',6500);
+  }catch(e){toast(e.message,'err',7000);}
+  busy(btn,false);
+}
+
+/* ---------- апелляция ---------- */
+function openAppeal(cid){
+  const ev=state.detail.evaluation,c=ev.checklist_snapshot.criteria.find(x=>x.id===cid);
+  state.appealCtx={cid:cid};
+  $('#mTitle').textContent='Оспорить критерий: '+critNo(ev.checklist_snapshot,cid)+'. '+c.name;
+  $('#mInfo').innerHTML='Диалог <b>'+esc(ev.conversation_id)+'</b> · текущая оценка: '+valBadge(c,uiVal(c,ev.final_answers[cid]));
+  $('#mWant').innerHTML='<option value="">—</option>'+allowed(c).map(o=>'<option value="'+esc(apiVal(c,o))+'">'+esc(o)+'</option>').join('');
+  $('#mText').value='';
+  $('#modal').classList.add('show');
+  setTimeout(()=>$('#mText').focus(),30);
+}
+function closeAppeal(){$('#modal').classList.remove('show');state.appealCtx=null;}
+async function sendAppeal(){
+  const txt=$('#mText').value.trim();
+  if(txt.length<10){toast('Опишите причину несогласия (минимум 10 символов)','warn');return;}
+  const d=state.detail,cid=state.appealCtx.cid;
+  try{
+    await api('/appeals',{method:'POST',body:{evaluation_id:d.evaluation.id,criterion_id:cid,comment:txt,requested_answer:$('#mWant').value||null,author:'Оператор'}});
+    state.open.add(d.conversation_id+':'+cid);
+    closeAppeal();
+    await Promise.all([loadDetail(d.conversation_id),loadList()]);
+    renderScorecard();
+    toast('Апелляция отправлена. Статус диалога: «Апелляция»','ok');
+  }catch(e){toast(e.message,'err');}
+}
+
+/* =====================================================================
+   СОБЫТИЯ
+===================================================================== */
+function bind(){
+  $$('.tab').forEach(t=>t.addEventListener('click',()=>setView(t.dataset.view)));
+  $('#roleSeg').addEventListener('click',e=>{const b=e.target.closest('button');if(b)setRole(b.dataset.role);});
+  $('#btnLoad').addEventListener('click',loadFromServer);
+  $('#groupId').addEventListener('keydown',e=>{if(e.key==='Enter')loadFromServer();});
+
+  $('#filters').addEventListener('click',e=>{
+    const b=e.target.closest('.chip');if(!b)return;
+    state.filters[b.dataset.f]=b.dataset.v;
+    if(b.dataset.f==='dataset')$('#envPill').textContent=b.dataset.v==='all'?(state.datasets.join(' · ')||'—'):b.dataset.v;
+    renderFilters();renderList();renderListActions();
+  });
+  $('#listActions').addEventListener('click',e=>{
+    const list=filtered();
+    if(e.target.closest('#btnEvalMissing'))startJob(list.filter(d=>!d.evaluation||d.evaluation.stale).map(d=>d.conversation_id)).catch(err=>toast(err.message,'err'));
+    if(e.target.closest('#btnEvalAll')){
+      if(!confirm('Заново прогнать ИИ по '+list.length+' диалогам? Неизменённые критерии будут взяты из прошлых оценок.'))return;
+      startJob(list.map(d=>d.conversation_id)).catch(err=>toast(err.message,'err'));
+    }
+  });
+  const pick=e=>{const li=e.target.closest('.li');if(li)selectDialog(li.dataset.id,true);};
+  $('#dlgList').addEventListener('click',pick);
+  $('#dlgList').addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();pick(e);}});
+
+  $('#transcriptPane').addEventListener('click',e=>{
+    const t=e.target.closest('.m-head .t');
+    if(t&&state.audioEl){const m=msgById(t.dataset.mid);if(m&&m.audio_sec!=null){state.audioEl.currentTime=m.audio_sec;state.audioEl.play().catch(()=>{});}}
+  });
+
+  const sp=$('#scorePane');
+  sp.addEventListener('change',async e=>{
+    if(e.target.id==='labelMode'){state.labelMode=e.target.checked;renderScorecard();return;}
+    if(e.target.classList.contains('gold-val')){
+      const answers=Object.assign({},(state.gold&&state.gold.answers)||{});
+      if(e.target.value)answers[e.target.dataset.cid]=e.target.value;else delete answers[e.target.dataset.cid];
+      try{state.gold=await api('/gold/'+encodeURIComponent(state.selectedId),{method:'PUT',body:{answers:answers}});renderScorecard();toast('Эталон сохранён','ok',1800);}
+      catch(err){toast(err.message,'err');}
+    }
+  });
+  sp.addEventListener('click',async e=>{
+    if(e.target.closest('#btnEvalOne')){evaluateOne(state.selectedId);return;}
+    const ev=e.target.closest('.ev');if(ev){goToMsg(ev.dataset.mid,ev.dataset.range?ev.dataset.range.split(','):null);return;}
+    const ap=e.target.closest('.btn-appeal');if(ap){e.stopPropagation();openAppeal(ap.dataset.cid);return;}
+    const sv=e.target.closest('.save-verdict');
+    if(sv){
+      const form=sv.closest('.rev-form'),cid=form.dataset.cid,d=state.detail,evl=d.evaluation;
+      const c=evl.checklist_snapshot.criteria.find(x=>x.id===cid);
+      const raw=$('.rev-val',form).value,reason=$('.rev-reason',form).value.trim();
+      if(reason.length<5){toast('Введите обоснование пересмотра (минимум 5 символов)','warn');return;}
+      const val=apiVal(c,c.type==='scale'&&raw!=='N/A'?Number(raw):raw);
+      const prev=evl.final_answers[cid];
+      const openAp=(d.appeals||[]).some(a=>a.status==='open'&&a.criterion_id===cid&&a.evaluation_id===evl.id);
+      if(val===prev&&!openAp){toast('Выберите оценку, отличную от текущей','warn');return;}
+      busy(sv,true,'Сохраняю…');
+      try{
+        const before=evl.final_score.total;
+        const upd=await api('/evaluations/'+evl.id+'/review',{method:'POST',body:{criterion_id:cid,new_answer:val,reason:reason,reviewer:'Супервизор'}});
+        state.open.add(d.conversation_id+':'+cid);
+        await Promise.all([loadDetail(d.conversation_id),loadList()]);
+        renderScorecard();
+        toast('Вердикт сохранён. Статус: «Пересмотрено». Балл: ['+fmt(before)+'] → ['+fmt(upd.final_score.total)+']','ok');
+      }catch(err){busy(sv,false);toast(err.message,'err');}
+      return;
+    }
+    const act=e.target.closest('[data-act]');
+    if(act){
+      const d=state.detail;if(!d||!d.evaluation)return;
+      d.evaluation.checklist_snapshot.criteria.forEach(c=>{const k=d.conversation_id+':'+c.id;act.dataset.act==='expand'?state.open.add(k):state.open.delete(k);});
+      renderScorecard();return;
+    }
+    const head=e.target.closest('.acc-head');
+    if(head){
+      const acc=head.parentElement,key=acc.dataset.key;
+      const o=!acc.classList.contains('open');
+      acc.classList.toggle('open',o);head.setAttribute('aria-expanded',o);
+      o?state.open.add(key):state.open.delete(key);
+    }
+  });
+  sp.addEventListener('keydown',e=>{
+    if((e.key==='Enter'||e.key===' ')&&e.target.classList.contains('acc-head')){e.preventDefault();e.target.click();}
+  });
+
+  /* модалка */
+  $('#mCancel').addEventListener('click',closeAppeal);
+  $('#mSend').addEventListener('click',sendAppeal);
+  $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeAppeal();});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')closeAppeal();});
+
+  /* сводка */
+  $('#statsPane').addEventListener('click',e=>{
+    const a=e.target.closest('.go-dlg');if(!a)return;e.preventDefault();
+    setView('dialogs');state.labelMode=true;selectDialog(a.dataset.id);
+  });
+
+  /* настройки */
+  const sb=$('#setBody');
+  const crit=el=>{const tr=el.closest('tr');return tr&&state.draft.criteria.find(x=>x.id===tr.dataset.id);};
+  sb.addEventListener('input',e=>{
+    const c=crit(e.target);if(!c)return;const t=e.target.classList;
+    if(t.contains('in-name'))c.name=e.target.value;
+    else if(t.contains('in-w'))c.weight=e.target.value===''?NaN:Number(e.target.value);
+    else if(t.contains('in-rule'))c.rule=e.target.value;
+    else if(t.contains('in-nacond'))c.na_condition=e.target.value;
+    else if(t.contains('in-guide'))c.guidance=e.target.value;
+    else if(t.contains('in-id')){const v=e.target.value.trim();$$('tr[data-id="'+CSS.escape(c.id)+'"]',sb).forEach(tr=>tr.dataset.id=v);c.id=v;}
+    else if(t.contains('in-scale')){
+      const p=parseScale(e.target.value);c._scaleRaw=e.target.value;c._scaleBad=!p;
+      if(p){const old={};(c.scale||[]).forEach(s=>{old[s.value]=s.label;});c.scale=p.map(v=>({value:v,label:old[v]||''}));}
+      e.target.classList.toggle('bad',!p);
+    }
+    else if(t.contains('in-steps')){
+      const map={};e.target.value.split('\n').forEach(l=>{const m=l.match(/^\s*(\d+(?:[.,]\d+)?)\s*[—–\-:|]\s*(.*)$/);if(m)map[Number(m[1].replace(',','.'))]=m[2].trim();});
+      (c.scale||[]).forEach(s=>{if(map[s.value]!==undefined)s.label=map[s.value];});
+    }
+    updateSum();
+  });
+  sb.addEventListener('change',e=>{
+    const c=crit(e.target);if(!c)return;
+    if(e.target.classList.contains('in-na')){c.na_allowed=e.target.checked;if(c.na_allowed&&c._open===undefined)c._open=true;renderSettings();}
+    else if(e.target.classList.contains('in-sec'))c.section=e.target.value;
+    else if(e.target.classList.contains('in-type')){
+      c.type=e.target.value;
+      if(c.type==='scale'&&!(c.scale&&c.scale.length))c.scale=[{value:10,label:'Полностью выполнено'},{value:5,label:'Частично'},{value:0,label:'Не выполнено'}];
+      renderSettings();
+    }
+  });
+  sb.addEventListener('click',e=>{
+    const tg=e.target.closest('.tgl-detail');
+    if(tg){const c=crit(tg);c._open=!c._open;renderSettings();return;}
+    const del=e.target.closest('.del');if(!del)return;
+    const c=crit(del);
+    state.draft.criteria=state.draft.criteria.filter(x=>x!==c);
+    renderSettings();
+    toast('Критерий удалён из черновика. Нажмите «Применить», чтобы сохранить и переоценить.','info',3500);
+  });
+  $('#btnAdd').addEventListener('click',()=>{
+    const cr=state.draft.criteria,flagIdx=cr.findIndex(c=>c.type==='flag');
+    let n=cr.length+1,id;do{id='c'+pad(n++);}while(cr.some(c=>c.id===id));
+    const prevSec=(cr[flagIdx>0?flagIdx-1:cr.length-1]||{}).section||((state.draft.sections||[])[0]||{}).id||'';
+    const nc={id:id,section:prevSec,name:'Новый критерий',type:'binary',weight:0,na_allowed:false,rule:'Да — ',na_condition:'',guidance:'',_isNew:true,_open:true};
+    if(flagIdx<0)cr.push(nc);else cr.splice(flagIdx,0,nc);
+    renderSettings();
+    const row=$('#setBody tr[data-id="'+nc.id+'"] .in-name');if(row){row.focus();row.select();}
+  });
+  $('#btnNormalize').addEventListener('click',normalizeDraft);
+  $('#btnResetDraft').addEventListener('click',()=>{newDraft();renderSettings();toast('Правки отменены','info',2500);});
+  $('#btnRegl').addEventListener('click',async()=>{
+    try{const def=await api('/checklists-default');const keepId=state.draft.id;newDraft(def);state.draft.id=keepId||def.id;renderSettings();
+      toast('Загружен регламент Freedom (в черновик). Нажмите «Применить», чтобы сохранить и переоценить.','info',4000);}
+    catch(e){toast(e.message,'err');}
+  });
+  $('#btnApply').addEventListener('click',applyConfig);
+  $('#btnToDialogs').addEventListener('click',()=>setView('dialogs'));
+}
+
+/* =====================================================================
+   ИНИЦИАЛИЗАЦИЯ
+===================================================================== */
+async function init(){
+  bind();
+  renderTranscript();renderScorecard();
+  try{
+    await Promise.all([loadHealth(),loadChecklist()]);
+    await loadList();
+    const first=filtered()[0];
+    if(first)selectDialog(first.conversation_id);
+  }catch(e){toast('Сервер недоступен: '+e.message,'err',8000);}
+  window.__CQA__={state:state,api:api};
+}
+init();
+})();
+</script>
 </body>
 </html>

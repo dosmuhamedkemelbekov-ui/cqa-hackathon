@@ -196,10 +196,20 @@ def latest_evaluation(conv_id: str, checklist_id: str | None = None) -> dict | N
 
 def evaluation_history(conv_id: str) -> list[dict]:
     rows = _conn.execute(
-        "SELECT id, checklist_id, checklist_version, created_at FROM evaluations WHERE conversation_id=? ORDER BY id DESC",
+        "SELECT id, checklist_id, checklist_version, created_at, data FROM evaluations WHERE conversation_id=? ORDER BY id DESC",
         (conv_id,),
     )
-    return [dict(r) for r in rows]
+    out = []
+    for r in rows:
+        d = json.loads(r["data"])
+        out.append({
+            "id": r["id"], "checklist_id": r["checklist_id"], "checklist_version": r["checklist_version"],
+            "created_at": r["created_at"], "ai_total": d["original_score"]["total"],
+            "final_total": d["final_score"]["total"], "model": d.get("model"),
+            "llm_calls": d.get("llm_calls"), "reused": d.get("reused_criteria", []),
+            "previous_total": d.get("previous_total"),
+        })
+    return out
 
 
 def latest_evaluations_map(checklist_id: str | None = None) -> dict[str, dict]:

@@ -86,6 +86,14 @@ def conversations(dataset: str | None = None):
                 "overridden": bool(ev.get("overrides")),
             }
         it["open_appeals"] = open_appeals.get(it["conversation_id"], 0)
+        if not ev:
+            it["status"] = "Не оценено"
+        elif it["open_appeals"]:
+            it["status"] = "Апелляция"
+        elif ev.get("decisions"):
+            it["status"] = "Пересмотрено"
+        else:
+            it["status"] = "Оценено"
     return items
 
 
@@ -164,6 +172,11 @@ def checklists():
     return [{**c, "active": c["id"] == active, "versions": db.checklist_versions(c["id"])} for c in db.list_checklists()]
 
 
+@app.get("/api/checklists-default")
+def checklist_default():
+    return json.loads(config.DEFAULT_CHECKLIST.read_text(encoding="utf-8"))
+
+
 @app.get("/api/checklists/{cl_id}")
 def checklist(cl_id: str, version: int | None = None):
     cl = db.get_checklist(cl_id, version)
@@ -196,6 +209,7 @@ class EvalReq(BaseModel):
     checklist_id: str | None = None
     only_missing: bool = False
     samples: int | None = None
+    reuse: bool = True  # неизменённые критерии берутся из прошлой оценки без вызова LLM
 
 
 def _checklist_for(req_id: str | None) -> dict:
@@ -206,25 +220,31 @@ def _checklist_for(req_id: str | None) -> dict:
 
 
 @app.post("/api/evaluate/{conv_id}")
-async def evaluate_one(conv_id: str, checklist_id: str | None = None, samples: int | None = None):
+async def evaluate_one(conv_id: str, checklist_id: str | None = None, samples: int | None = None, fresh: bool = True):
     if not llm.is_configured():
         raise HTTPException(400, "LLM не настроена: задайте OPENAI_API_KEY (или OPENAI_BASE_URL для локальной модели) в .env")
     conv = db.get_conversation(conv_id)
     if not conv:
         raise HTTPException(404, "Диалог не найден")
-    ev = await evaluator.evaluate(conv, _checklist_for(checklist_id), samples)
+    # fresh=True: ИИ заново отвечает по всем критериям; вердикты супервизора по неизменённым критериям сохраняются.
+    previous = db.latest_evaluation(conv_id)
+    ev = await evaluator.evaluate(conv, _checklist_for(checklist_id), samples, previous, reuse_answers=not fresh)
     return db.save_evaluation(ev)
 
 
-async def _run_job(job_id: str, conv_ids: list[str], cl: dict, samples: int | None):
+async def _run_job(job_id: str, conv_ids: list[str], cl: dict, samples: int | None, reuse: bool = True):
     job = JOBS[job_id]
 
     async def one(cid: str):
         try:
             conv = db.get_conversation(cid)
-            ev = await evaluator.evaluate(conv, cl, samples)
+            previous = db.latest_evaluation(cid) if reuse else None
+            ev = await evaluator.evaluate(conv, cl, samples, previous)
             db.save_evaluation(ev)
             job["cost_usd"] += ev["cost_usd"]
+            job["llm_calls"] += ev["llm_calls"]
+            job["results"].append({"conversation_id": cid, "before": ev.get("previous_total"),
+                                   "after": ev["final_score"]["total"], "ai_after": ev["original_score"]["total"]})
         except Exception as e:  # noqa: BLE001
             job["failed"].append({"conversation_id": cid, "error": str(e)})
         finally:
@@ -249,8 +269,8 @@ async def evaluate_batch(req: EvalReq, background: BackgroundTasks):
         ]
     job_id = uuid.uuid4().hex[:8]
     JOBS[job_id] = {"id": job_id, "status": "running", "total": len(ids), "done": 0, "failed": [], "cost_usd": 0.0,
-                    "checklist": f"{cl['name']} v{cl['version']}"}
-    background.add_task(_run_job, job_id, ids, cl, req.samples)
+                    "llm_calls": 0, "results": [], "checklist": f"{cl['name']} v{cl['version']}"}
+    background.add_task(_run_job, job_id, ids, cl, req.samples, req.reuse)
     return JOBS[job_id]
 
 
@@ -329,26 +349,53 @@ def decide(appeal_id: int, req: DecisionReq):
         raise HTTPException(404, "Апелляция не найдена")
     if a["status"] != "open":
         raise HTTPException(409, "Апелляция уже рассмотрена")
-    if not req.reason.strip():
-        raise HTTPException(400, "Укажите причину решения")
     ev = db.get_evaluation(a["evaluation_id"])
     current = ev["final_answers"].get(a["criterion_id"])
     new_answer = current if req.decision == "confirm" else req.new_answer
     if new_answer is None:
         raise HTTPException(400, "Выберите новую оценку")
+    ev = _apply_review(ev, a["criterion_id"], new_answer, req.reason, req.reviewer, appeal_id)
+    return {"appeal": db.get_appeal(appeal_id), "evaluation": ev}
+
+
+def _apply_review(ev: dict, criterion_id: str, new_answer: str, reason: str, reviewer: str | None,
+                  appeal_id: int | None = None) -> dict:
+    """Вердикт супервизора: меняет/подтверждает ответ, пересчитывает итог, закрывает открытую апелляцию."""
+    if not reason.strip():
+        raise HTTPException(400, "Укажите причину решения")
+    current = ev["final_answers"].get(criterion_id)
+    before = ev["final_score"]["total"]
     try:
-        ev = evaluator.apply_override(ev, a["criterion_id"], new_answer)
-    except ValueError as e:
+        ev = evaluator.apply_override(ev, criterion_id, new_answer)
+    except (ValueError, StopIteration) as e:
         raise HTTPException(400, str(e))
     ev.setdefault("decisions", []).append(
-        {"appeal_id": appeal_id, "criterion_id": a["criterion_id"], "from": current, "to": new_answer,
-         "reason": req.reason.strip(), "reviewer": req.reviewer, "at": db.now()}
+        {"appeal_id": appeal_id, "criterion_id": criterion_id, "from": current, "to": new_answer,
+         "reason": reason.strip(), "reviewer": reviewer or "Супервизор", "at": db.now(),
+         "total_before": before, "total_after": ev["final_score"]["total"]}
     )
     db.update_evaluation(ev)
-    data = {**a["data"], "decision": req.decision, "new_answer": new_answer, "reason": req.reason.strip(),
-            "reviewer": req.reviewer, "total_after": ev["final_score"]["total"]}
-    status = "confirmed" if new_answer == current else "changed"
-    return {"appeal": db.resolve_appeal(appeal_id, status, data), "evaluation": ev}
+    for a in db.list_appeals(status="open", conversation_id=ev["conversation_id"]):
+        if a["criterion_id"] == criterion_id and (appeal_id is None or a["id"] == appeal_id):
+            data = {**a["data"], "decision": "change" if new_answer != current else "confirm", "new_answer": new_answer,
+                    "reason": reason.strip(), "reviewer": reviewer, "total_after": ev["final_score"]["total"]}
+            db.resolve_appeal(a["id"], "confirmed" if new_answer == current else "changed", data)
+    return ev
+
+
+class ReviewReq(BaseModel):
+    criterion_id: str
+    new_answer: str
+    reason: str
+    reviewer: str | None = "Супервизор"
+
+
+@app.post("/api/evaluations/{ev_id}/review")
+def review(ev_id: int, req: ReviewReq):
+    ev = db.get_evaluation(ev_id)
+    if not ev:
+        raise HTTPException(404, "Оценка не найдена")
+    return _apply_review(ev, req.criterion_id, req.new_answer, req.reason, req.reviewer)
 
 
 # ---------------- экспорт ----------------

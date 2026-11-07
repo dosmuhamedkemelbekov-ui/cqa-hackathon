@@ -193,13 +193,40 @@ def build_result(conv: dict, checklist: dict, crit_results: dict[str, dict], met
     }
 
 
-async def evaluate(conv: dict, checklist: dict, samples: int | None = None) -> dict:
+PROMPT_FIELDS = ("name", "type", "rule", "na_allowed", "na_condition", "guidance", "scale")
+
+
+def _same_prompt(a: dict, b: dict) -> bool:
+    """Критерий не менялся по смыслу (вес и секция на ответ ИИ не влияют)."""
+    return all(a.get(f) == b.get(f) for f in PROMPT_FIELDS)
+
+
+async def evaluate(conv: dict, checklist: dict, samples: int | None = None, previous: dict | None = None,
+                   reuse_answers: bool = True) -> dict:
+    """previous — прошлая оценка диалога: неизменённые критерии берутся из неё без вызова LLM,
+    решения супервизора по ним сохраняются. Новые и изменённые критерии оцениваются заново."""
     samples = samples or int(getattr(config, "LLM_SAMPLES", 1) or 1)
     t0 = time.time()
     prepared = preprocess.prepare(conv)
-    tasks = [evaluate_criterion(c, prepared, samples) for c in checklist["criteria"]]
-    results = await asyncio.gather(*tasks)
-    crit_results = {r["criterion_id"]: r for r in results}
+    reused: dict[str, dict] = {}
+    unchanged: set[str] = set()  # критерии, по которым вердикт супервизора остаётся в силе
+    if previous:
+        prev_defs = {c["id"]: c for c in previous["checklist_snapshot"]["criteria"]}
+        prev_items = {i["criterion_id"]: i for i in previous["criteria"]}
+        for c in checklist["criteria"]:
+            p, item = prev_defs.get(c["id"]), prev_items.get(c["id"])
+            if p and _same_prompt(c, p):
+                unchanged.add(c["id"])
+            if reuse_answers and p and item and item.get("answer") is not None and _same_prompt(c, p):
+                reused[c["id"]] = {
+                    **{k: item.get(k) for k in ("answer", "evidence", "checked_range", "rationale", "analysis", "confidence", "votes")},
+                    "criterion_id": c["id"],
+                    "reused": True,
+                    "usage": {"input": 0, "cached": 0, "output": 0},
+                }
+    todo = [c for c in checklist["criteria"] if c["id"] not in reused]
+    results = await asyncio.gather(*[evaluate_criterion(c, prepared, samples) for c in todo])
+    crit_results = {r["criterion_id"]: r for r in results} | reused
     usage = {"input": 0, "cached": 0, "output": 0}
     for r in results:
         for k in usage:
@@ -208,12 +235,27 @@ async def evaluate(conv: dict, checklist: dict, samples: int | None = None) -> d
         "model": config.LLM_MODEL,
         "samples": samples,
         "llm_calls": len(results) * samples,
+        "reused_criteria": sorted(reused),
         "usage": usage,
         "cost_usd": round(llm.cost_usd(usage), 5),
         "duration_s": round(time.time() - t0, 1),
         "errors": [r["criterion_id"] for r in results if r.get("answer") is None],
     }
-    return build_result(conv, checklist, crit_results, meta)
+    ev = build_result(conv, checklist, crit_results, meta)
+    for item in ev["criteria"]:
+        item["reused"] = item["criterion_id"] in reused
+    # Вердикты супервизора по неизменённым критериям остаются в силе.
+    if previous:
+        for cid, ans in (previous.get("overrides") or {}).items():
+            if cid in unchanged:
+                try:
+                    apply_override(ev, cid, ans)
+                except (ValueError, StopIteration):
+                    pass
+        ev["decisions"] = [d for d in previous.get("decisions", []) if d["criterion_id"] in unchanged]
+        ev["previous_evaluation_id"] = previous.get("id")
+        ev["previous_total"] = previous["final_score"]["total"]
+    return ev
 
 
 def apply_override(ev: dict, criterion_id: str, answer: str) -> dict:
