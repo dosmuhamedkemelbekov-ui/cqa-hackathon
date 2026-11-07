@@ -314,8 +314,11 @@ async def evaluate_one(conv_id: str, checklist_id: str | None = None, samples: i
         raise HTTPException(404, "Диалог не найден")
     # fresh=True: ИИ заново отвечает по всем критериям; вердикты супервизора по неизменённым критериям сохраняются.
     previous = db.latest_evaluation(conv_id)
-    ev = await evaluator.evaluate(conv, _checklist_for(checklist_id), samples, previous, reuse_answers=not fresh,
-                                  precedents=db.get_setting("precedents", []))
+    try:
+        ev = await evaluator.evaluate(conv, _checklist_for(checklist_id), samples, previous, reuse_answers=not fresh,
+                                      precedents=db.get_setting("precedents", []))
+    except RuntimeError as e:  # лимит модели, пустой диалог и т.п. — понятная причина вместо «Internal Server Error»
+        raise HTTPException(502, str(e)[:500])
     ev["reliability"] = evaluator.reliability(ev)
     return db.save_evaluation(ev)
 

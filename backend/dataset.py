@@ -8,6 +8,16 @@ from .config import DATASET_API_URL
 
 REQUIRED = {"conversation_id", "transcript"}
 
+# Роли по спецификации: client, operator, bot, system. Синонимы приводим к ним, чтобы не потерять оператора.
+_SPEAKERS = {"operator": "operator", "agent": "operator", "оператор": "operator", "support": "operator",
+             "client": "client", "customer": "client", "user": "client", "клиент": "client",
+             "bot": "bot", "бот": "bot", "assistant": "bot", "system": "system", "система": "system"}
+
+
+def norm_speaker(x) -> str:
+    s = str(x or "").strip().lower()
+    return _SPEAKERS.get(s, s)
+
 
 def validate_records(records: list[dict]) -> list[dict]:
     out = []
@@ -25,7 +35,7 @@ def validate_records(records: list[dict]) -> list[dict]:
                 "channel": r.get("channel") or "agent chat",
                 "language": (r.get("language") or "").upper() or None,
                 "transcript": [
-                    {"timestamp": str(t.get("timestamp", "")), "speaker": str(t.get("speaker", "")).lower(),
+                    {"timestamp": str(t.get("timestamp", "")), "speaker": norm_speaker(t.get("speaker", "")),
                      "text": str(t.get("text", ""))}
                     for t in transcript
                 ],
