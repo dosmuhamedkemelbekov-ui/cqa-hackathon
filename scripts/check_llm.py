@@ -1,6 +1,7 @@
 """Быстрая проверка ключа и модели из .env одним маленьким запросом.
 
-    py scripts/check_llm.py
+    py scripts/check_llm.py            # проверить модель из .env
+    py scripts/check_llm.py --models   # список моделей, доступных ключу
 
 Выводит «OK» и ответ модели или полный текст ошибки провайдера (ключ, имя модели, лимит).
 """
@@ -26,6 +27,24 @@ async def main() -> int:
     if not llm.is_configured():
         print("Ключ не задан: проверьте .env (OPENAI_API_KEY или ANTHROPIC_API_KEY).")
         return 1
+    if "--models" in sys.argv or config.LLM_PROVIDER != "anthropic":
+        try:
+            ids = sorted(m.id.removeprefix("models/") async for m in llm.client().models.list())
+        except Exception as e:  # noqa: BLE001
+            ids = []
+            print(f"Список моделей получить не удалось: {str(e)[:200]}")
+        if "--models" in sys.argv:
+            print("Доступные модели:")
+            for i in ids:
+                print("  ", i)
+            return 0
+        if ids and config.LLM_MODEL not in ids:
+            near = [i for i in ids if "flash" in i or "lite" in i or "mini" in i][:15]
+            print(f"Модели «{config.LLM_MODEL}» нет у провайдера. Похожие доступные:")
+            for i in near:
+                print("  ", i)
+            print("Впишите одну из них в CQA_MODEL в .env (полный список: py scripts/check_llm.py --models).")
+            return 1
     t0 = time.time()
     try:
         data, usage = await llm.complete_json(
