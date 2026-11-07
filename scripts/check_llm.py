@@ -29,7 +29,7 @@ async def main() -> int:
         return 1
     if "--models" in sys.argv or config.LLM_PROVIDER != "anthropic":
         try:
-            ids = sorted(m.id.removeprefix("models/") async for m in llm.client().models.list())
+            ids = sorted([m.id.removeprefix("models/") async for m in llm.client().models.list()])
         except Exception as e:  # noqa: BLE001
             ids = []
             print(f"Список моделей получить не удалось: {str(e)[:200]}")
