@@ -1,0 +1,1032 @@
+{
+  "p1-en-001": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "na",
+      "c03": "na",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "no",
+      "c08": "no"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p1-en-002": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "na",
+      "c03": "na",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "no",
+      "c08": "no"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p1-en-003": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "na",
+      "c03": "na",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "no",
+      "c08": "no"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p1-en-004": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "na",
+      "c03": "na",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "no",
+      "c08": "no"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p1-en-005": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "na",
+      "c03": "na",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "no",
+      "c08": "no"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p1-en-006": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "yes",
+      "c03": "yes",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "yes",
+      "c08": "no"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p1-en-007": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "na",
+      "c03": "na",
+      "c04": "10",
+      "c05": "yes",
+      "c06": "7",
+      "c07": "no",
+      "c08": "no"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p1-en-008": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "na",
+      "c03": "na",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "no",
+      "c08": "no"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p1-en-009": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "na",
+      "c03": "na",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "na",
+      "c08": "no"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p1-en-010": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "na",
+      "c03": "na",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "no",
+      "c08": "no"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p1-en-011": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "na",
+      "c03": "na",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "no",
+      "c08": "no"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p1-en-012": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "na",
+      "c03": "na",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "no",
+      "c08": "no"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p1-en-013": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "na",
+      "c03": "na",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "no",
+      "c08": "yes"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p1-en-014": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "na",
+      "c03": "no",
+      "c04": "5",
+      "c05": "no",
+      "c06": "4",
+      "c07": "no",
+      "c08": "yes"
+    },
+    "uncertain": [
+      "c02",
+      "c04"
+    ],
+    "updated_at": "2026-11-07"
+  },
+  "p1-en-015": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "no",
+      "c02": "no",
+      "c03": "na",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "4",
+      "c07": "no",
+      "c08": "no"
+    },
+    "uncertain": [
+      "c05"
+    ],
+    "updated_at": "2026-11-07"
+  },
+  "p1-kz-001": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "na",
+      "c03": "na",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "no",
+      "c08": "no"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p1-kz-002": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "na",
+      "c03": "na",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "no",
+      "c08": "no"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p1-kz-003": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "yes",
+      "c03": "yes",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "yes",
+      "c08": "no"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p1-kz-004": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "na",
+      "c03": "na",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "no",
+      "c08": "no"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p1-kz-005": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "na",
+      "c03": "na",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "4",
+      "c07": "no",
+      "c08": "no"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p1-kz-006": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "na",
+      "c03": "na",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "no",
+      "c08": "no"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p1-kz-007": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "na",
+      "c03": "na",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "no",
+      "c08": "no"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p1-kz-008": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "no",
+      "c02": "no",
+      "c03": "na",
+      "c04": "20",
+      "c05": "no",
+      "c06": "7",
+      "c07": "no",
+      "c08": "no"
+    },
+    "uncertain": [
+      "c05",
+      "c07"
+    ],
+    "updated_at": "2026-11-07"
+  },
+  "p1-kz-009": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "na",
+      "c03": "na",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "no",
+      "c08": "no"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p1-kz-010": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "na",
+      "c03": "na",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "no",
+      "c08": "no"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p1-kz-011": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "na",
+      "c03": "na",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "na",
+      "c08": "no"
+    },
+    "uncertain": [
+      "c04"
+    ],
+    "updated_at": "2026-11-07"
+  },
+  "p1-kz-012": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "yes",
+      "c03": "na",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "yes",
+      "c08": "no"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p1-kz-013": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "na",
+      "c03": "na",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "no",
+      "c08": "yes"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p1-kz-014": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "na",
+      "c03": "na",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "no",
+      "c08": "no"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p1-kz-015": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "na",
+      "c03": "no",
+      "c04": "5",
+      "c05": "no",
+      "c06": "4",
+      "c07": "yes",
+      "c08": "yes"
+    },
+    "uncertain": [
+      "c02",
+      "c04",
+      "c07"
+    ],
+    "updated_at": "2026-11-07"
+  },
+  "p1-ru-001": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "na",
+      "c03": "na",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "no",
+      "c08": "no"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p1-ru-002": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "yes",
+      "c03": "na",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "yes",
+      "c08": "no"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p1-ru-003": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "yes",
+      "c03": "na",
+      "c04": "10",
+      "c05": "yes",
+      "c06": "7",
+      "c07": "no",
+      "c08": "no"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p1-ru-004": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "na",
+      "c03": "na",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "no",
+      "c08": "no"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p1-ru-005": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "na",
+      "c03": "na",
+      "c04": "15",
+      "c05": "yes",
+      "c06": "4",
+      "c07": "yes",
+      "c08": "no"
+    },
+    "uncertain": [
+      "c04"
+    ],
+    "updated_at": "2026-11-07"
+  },
+  "p1-ru-006": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "yes",
+      "c03": "yes",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "yes",
+      "c08": "no"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p1-ru-007": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "na",
+      "c03": "na",
+      "c04": "10",
+      "c05": "yes",
+      "c06": "7",
+      "c07": "no",
+      "c08": "no"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p1-ru-008": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "na",
+      "c03": "na",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "no",
+      "c08": "no"
+    },
+    "uncertain": [
+      "c07"
+    ],
+    "updated_at": "2026-11-07"
+  },
+  "p1-ru-009": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "yes",
+      "c03": "no",
+      "c04": "5",
+      "c05": "no",
+      "c06": "4",
+      "c07": "yes",
+      "c08": "yes"
+    },
+    "uncertain": [
+      "c04",
+      "c07"
+    ],
+    "updated_at": "2026-11-07"
+  },
+  "p1-ru-010": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "yes",
+      "c03": "yes",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "yes",
+      "c08": "no"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p1-ru-011": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "na",
+      "c03": "na",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "no",
+      "c08": "no"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p1-ru-012": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "na",
+      "c03": "na",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "na",
+      "c08": "no"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p1-ru-013": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "na",
+      "c03": "na",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "yes",
+      "c08": "no"
+    },
+    "uncertain": [
+      "c07"
+    ],
+    "updated_at": "2026-11-07"
+  },
+  "p1-ru-014": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "no",
+      "c02": "no",
+      "c03": "na",
+      "c04": "20",
+      "c05": "no",
+      "c06": "7",
+      "c07": "no",
+      "c08": "no"
+    },
+    "uncertain": [
+      "c05"
+    ],
+    "updated_at": "2026-11-07"
+  },
+  "p1-ru-015": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "na",
+      "c03": "na",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "yes",
+      "c08": "no"
+    },
+    "uncertain": [
+      "c07"
+    ],
+    "updated_at": "2026-11-07"
+  },
+  "p1-ru-016": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "no",
+      "c03": "na",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "4",
+      "c07": "no",
+      "c08": "no"
+    },
+    "uncertain": [
+      "c05"
+    ],
+    "updated_at": "2026-11-07"
+  },
+  "p1-ru-017": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "no",
+      "c03": "na",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "no",
+      "c08": "no"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p1-ru-018": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "no",
+      "c03": "na",
+      "c04": "0",
+      "c05": "no",
+      "c06": "4",
+      "c07": "no",
+      "c08": "no"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p1-ru-019": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "yes",
+      "c03": "na",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "no",
+      "c08": "no"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p1-ru-020": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "na",
+      "c03": "na",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "no",
+      "c08": "no"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p1-ru-021": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "na",
+      "c03": "na",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "no",
+      "c08": "no"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p1-ru-022": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "no",
+      "c03": "na",
+      "c04": "0",
+      "c05": "no",
+      "c06": "7",
+      "c07": "no",
+      "c08": "yes"
+    },
+    "uncertain": [
+      "c02",
+      "c06"
+    ],
+    "updated_at": "2026-11-07"
+  },
+  "p1-ru-023": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "na",
+      "c03": "na",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "no",
+      "c08": "yes"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p1-ru-024": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "na",
+      "c03": "na",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "no",
+      "c08": "no"
+    },
+    "uncertain": [
+      "c04"
+    ],
+    "updated_at": "2026-11-07"
+  },
+  "p1-ru-025": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "na",
+      "c03": "na",
+      "c04": "na",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "na",
+      "c08": "no"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p1-ru-026": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "no",
+      "c03": "na",
+      "c04": "0",
+      "c05": "no",
+      "c06": "4",
+      "c07": "no",
+      "c08": "no"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p1-ru-027": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "na",
+      "c03": "na",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "no",
+      "c08": "no"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p1-ru-028": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "na",
+      "c03": "na",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "no",
+      "c08": "no"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p1-ru-029": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "na",
+      "c03": "na",
+      "c04": "20",
+      "c05": "no",
+      "c06": "7",
+      "c07": "no",
+      "c08": "yes"
+    },
+    "uncertain": [
+      "c06"
+    ],
+    "updated_at": "2026-11-07"
+  },
+  "p1-ru-030": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "yes",
+      "c03": "na",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "no",
+      "c08": "no"
+    },
+    "uncertain": [],
+    "updated_at": "2026-11-07"
+  },
+  "p4-ru-001": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "na",
+      "c03": "na",
+      "c04": "10",
+      "c05": "no",
+      "c06": "7",
+      "c07": "na",
+      "c08": "no"
+    },
+    "uncertain": [
+      "c04",
+      "c06",
+      "c07"
+    ],
+    "updated_at": "2026-11-07"
+  },
+  "p4-ru-002": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "no",
+      "c02": "na",
+      "c03": "yes",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "10",
+      "c07": "no",
+      "c08": "no"
+    },
+    "uncertain": [
+      "c01",
+      "c07"
+    ],
+    "updated_at": "2026-11-07"
+  },
+  "p4-ru-003": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "no",
+      "c03": "yes",
+      "c04": "20",
+      "c05": "yes",
+      "c06": "7",
+      "c07": "na",
+      "c08": "no"
+    },
+    "uncertain": [
+      "c02",
+      "c04",
+      "c07"
+    ],
+    "updated_at": "2026-11-07"
+  },
+  "p4-ru-004": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "yes",
+      "c02": "yes",
+      "c03": "yes",
+      "c04": "20",
+      "c05": "no",
+      "c06": "7",
+      "c07": "na",
+      "c08": "no"
+    },
+    "uncertain": [
+      "c05",
+      "c07"
+    ],
+    "updated_at": "2026-11-07"
+  },
+  "p4-ru-005": {
+    "annotator": "team-review",
+    "answers": {
+      "c01": "no",
+      "c02": "yes",
+      "c03": "na",
+      "c04": "15",
+      "c05": "yes",
+      "c06": "7",
+      "c07": "no",
+      "c08": "no"
+    },
+    "uncertain": [
+      "c01",
+      "c03",
+      "c04",
+      "c07"
+    ],
+    "updated_at": "2026-11-07"
+  }
+}
