@@ -1172,6 +1172,7 @@ function validateDraft(){
 }
 function draftSum(){return state.draft.criteria.reduce((s,c)=>s+(c.type!=='flag'&&Number.isFinite(c.weight)?c.weight:0),0);}
 function updateSum(){
+  if(!state.draft||!$('#sumBox'))return; // вкладка настроек ещё не открывалась
   const sum=draftSum(),ok=Math.abs(sum-100)<=0.005;
   const box=$('#sumBox');
   box.className='sumbox '+(ok?'ok':'err');
@@ -1233,7 +1234,8 @@ async function startJob(ids,fromSettings){
   const j=await api('/evaluate',{method:'POST',body:{conversation_ids:ids,reuse:true}});
   if(!j.total){toast('Нечего оценивать','info');return;}
   state.job=j;state.jobBefore=before;state.jobFromSettings=!!fromSettings;
-  renderListActions();updateSum();pollJob();
+  pollJob();
+  try{renderListActions();updateSum();}catch(e){console.error(e);}
 }
 async function pollJob(){
   if(!state.job)return;
