@@ -548,6 +548,25 @@ h1,h2,h3,h4,.ttl,.t-head h2{font-family:var(--font-h);letter-spacing:-.01em}
 .msg.inrange .bubble{background-image:linear-gradient(90deg,rgba(240,196,106,.18),rgba(240,196,106,.05))}
 
 /* дорожки речи (как в макете: Клиент / Оператор) */
+#pfBody.hidden{display:none}
+.pf{padding:8px 18px 10px;border-bottom:1px solid var(--n30);background:#fff}
+.pf-toggle{display:flex;align-items:baseline;gap:8px;width:100%;background:none;border:0;padding:2px 0;text-align:left;color:var(--n100)}
+.pf-toggle b{font-size:12.5px}.pf-toggle span{font-size:11px;color:var(--n80)}.pf-chev{margin-left:auto;transition:transform .2s}
+.pf-toggle[aria-expanded="false"] .pf-chev{transform:rotate(-90deg)}
+.pf-tiles{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:stretch}
+.pf-tile{flex:1 1 90px;border:1px solid var(--n30);border-radius:6px;padding:6px 8px;background:var(--n10);display:flex;flex-direction:column;min-width:86px}
+.pf-tile b{font-size:16px;font-variant-numeric:tabular-nums}.pf-tile span{font-size:10.5px;color:var(--n80);line-height:1.2}
+.pf-tile.warn{border-color:var(--warn-bd);background:var(--warn-bg)}.pf-tile.ok b{color:var(--ok)}
+.pf-share{flex:2 1 180px;border:1px solid var(--n30);border-radius:6px;padding:7px 8px;background:var(--n10)}
+.pf-bar{display:flex;height:8px;border-radius:4px;overflow:hidden;background:var(--n30)}
+.pf-bar i.op{background:var(--g500)}.pf-bar i.cl{background:#36584a}
+.pf-leg{display:flex;justify-content:space-between;font-size:11px;color:var(--n80);margin-top:5px}
+.pf-leg i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px;vertical-align:0}.pf-leg i.op{background:var(--g500)}.pf-leg i.cl{background:#36584a}
+.pf-insl{display:flex;flex-direction:column;gap:4px;margin-top:8px}
+.pf-ins{font-size:12px;text-align:left;border:0;border-radius:5px;padding:4px 8px;background:var(--n10);color:var(--n100)}
+button.pf-ins{cursor:pointer}button.pf-ins:hover{filter:brightness(.96)}
+.pf-ins.warn{background:var(--warn-bg);color:var(--warn)}.pf-ins.info{background:var(--info-bg);color:var(--info)}.pf-ins.ok{background:var(--ok-bg);color:var(--ok)}
+.pf-go{opacity:.75;font-family:Consolas,monospace;font-size:11px}
 .lanes{padding:12px 18px 10px;border-bottom:1px solid var(--n30);background:linear-gradient(180deg,#fff,var(--n10))}
 .lane{display:grid;grid-template-columns:78px 1fr;align-items:center;gap:10px;height:34px}
 .lane-name{font-size:12.5px;font-weight:700;color:var(--n100)}
@@ -1153,7 +1172,7 @@ function renderTranscript(){
         ?'<span class="src">Загруженная запись · роли размечены автоматически</span>'
         :'<a class="src" href="'+esc(d.audio_page)+'" target="_blank" title="Плеер организаторов">Запись звонка · позиции реплик учитывают паузы записи</a>')+'</div></div>';
   }
-  html+=lanesHtml(d);
+  html+=lanesHtml(d)+profileHtml(d);
   const marks=evidenceMarks(d);
   const nBot=d.messages.filter(m=>m.speaker==='bot').length;
   html+='<div class="t-tools"><div class="tsearch"><input id="tSearch" type="search" placeholder="Найти в диалоге…" value="'+esc(state.tq)+'" autocomplete="off"><span id="tCount"></span></div>'+
@@ -1440,7 +1459,8 @@ function lanesData(d){
   const lanes={client:new Array(LANE_BINS).fill(0),operator:new Array(LANE_BINS).fill(0)};
   ms.forEach((m,i)=>{
     if(!lanes[m.speaker])return;
-    const st=m.sec-t0,nx=i+1<ms.length?ms[i+1].sec-t0:st+4;
+    // в звонках таймкод = конец фразы, start_sec — оценённое начало (бэкенд); в чатах они совпадают
+    const st=(m.start_sec!=null?m.start_sec:m.sec)-t0,nx=m.end_sec!=null&&m.end_sec>m.start_sec?m.end_sec-t0:(i+1<ms.length?ms[i+1].sec-t0:st+4);
     const dur=Math.max(2,Math.min(nx-st,Math.max(3,(m.text||'').length/12)));
     const a=Math.floor(st/T*LANE_BINS),b=Math.min(LANE_BINS-1,Math.floor((st+dur)/T*LANE_BINS));
     const w=Math.min(1,0.35+(m.text||'').length/160);
@@ -1458,6 +1478,33 @@ function lanesHtml(d){
     '<div class="lanes-foot"><button class="lanes-play" id="lanesPlay" type="button"'+(d.has_audio?' aria-label="Воспроизвести запись"':' disabled title="Аудиозапись есть только у звонков" aria-label="Нет записи"')+'>'+PLAY_ICO+'</button>'+
     '<span class="tm" id="lanesTm">00:00 / '+dur+'</span><span class="prog"><i id="lanesProg" style="width:0"></i></span>'+
     '<span class="lanes-hint" title="'+(d.has_audio?'Клик по дорожке — переход к реплике и месту в записи':'Клик по дорожке — переход к реплике')+'">Клик по дорожке → реплика</span></div></div>';
+}
+/* ПРОФИЛЬ РАЗГОВОРА: темп, доля речи, паузы, перебивания (звонки) и скорость ответов (чаты) — по таймкодам, без ИИ */
+function profileHtml(d){
+  const p=d.profile;if(!p||!p.available)return '';
+  if(state.pfOpen===undefined)state.pfOpen=true;
+  const call=p.kind==='call';
+  const share=p.talk_share||{operator:0,client:0};
+  const tile=(v,lbl,cls,tip)=>'<div class="pf-tile'+(cls?' '+cls:'')+'"'+(tip?' title="'+esc(tip)+'"':'')+'><b>'+v+'</b><span>'+lbl+'</span></div>';
+  let tiles='<div class="pf-share" title="'+(call?'Доля слов в разговоре после подключения оператора':'Доля сообщений после подключения оператора')+'">'+
+    '<div class="pf-bar"><i class="op" style="width:'+share.operator+'%"></i><i class="cl" style="width:'+share.client+'%"></i></div>'+
+    '<div class="pf-leg"><span><i class="op"></i>Оператор '+share.operator+'%</span><span><i class="cl"></i>Клиент '+share.client+'%</span></div></div>';
+  if(call){
+    const w=p.wpm||{};
+    const wcls=w.operator==null?'':(w.operator>=170||w.operator<=85?'warn':'ok');
+    tiles+=tile(w.operator!=null?w.operator:'—','слов/мин оператор',wcls,'Комфортный темп 110–150 слов в минуту. Оценка по таймкодам распознавания речи.')+
+      tile(w.client!=null?w.client:'—','слов/мин клиент','')+
+      tile((p.interruptions||[]).length,'возм. перебиваний',(p.interruptions||[]).length>=2?'warn':'','Оператор начал содержательную фразу, когда клиент ещё говорил (≥2 с перекрытия)')+
+      tile(p.silences&&p.silences.length?p.silences[0].seconds+' с':'—','макс. тишина',p.silences&&p.silences[0]&&p.silences[0].seconds>=15?'warn':'','Клиент договорил — оператор не начинал отвечать');
+  }else{
+    tiles+=tile(p.reply_median_s!=null?fmtSec(p.reply_median_s):'—','медиана ответа','','Сколько клиент обычно ждёт ответа оператора')+
+      tile(p.reply_max?fmtSec(p.reply_max.seconds):'—','макс. ожидание',p.reply_max&&p.reply_max.seconds>=120?'warn':'')+
+      tile(p.operator_avg_words||0,'слов в ответе',p.operator_avg_words<=4?'warn':'','Средняя длина сообщения оператора');
+  }
+  const ins=(p.insights||[]).map(x=>'<'+(x.msg?'button':'div')+' class="pf-ins '+x.level+'"'+(x.msg?' data-mid="'+esc(x.msg)+'" title="Перейти к реплике"':'')+'>'+
+    (x.level==='ok'?'✓':x.level==='warn'?'!':'i')+' '+esc(x.text)+(x.msg?' <span class="pf-go">→ '+esc(x.msg)+'</span>':'')+'</'+(x.msg?'button':'div')+'>').join('');
+  return '<div class="pf"><button class="pf-toggle" type="button" aria-expanded="'+state.pfOpen+'"><b>Профиль '+(call?'звонка':'переписки')+'</b><span>по таймкодам, без ИИ'+(call?' · таймкод = конец фразы, начало оценено по словам':'')+'</span><span class="pf-chev">▾</span></button>'+
+    '<div id="pfBody" class="'+(state.pfOpen?'':'hidden')+'"><div class="pf-tiles">'+tiles+'</div><div class="pf-insl">'+ins+'</div></div></div>';
 }
 const PLAY_ICO='<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4v16l13-8z"/></svg>';
 const PAUSE_ICO='<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>';
@@ -2217,6 +2264,8 @@ function bind(){
   });
   $('#transcriptPane').addEventListener('click',e=>{
     const mk=e.target.closest('.emark');if(mk){openCriterion(mk.dataset.cid);return;}
+    const pi=e.target.closest('.pf-ins[data-mid]');if(pi){goToMsg(pi.dataset.mid);return;}
+    const pt=e.target.closest('.pf-toggle');if(pt){state.pfOpen=!state.pfOpen;const b=$('#pfBody');if(b)b.classList.toggle('hidden',!state.pfOpen);pt.setAttribute('aria-expanded',state.pfOpen);return;}
     const bb=e.target.closest('.msg.bot .bubble');if(bb&&!e.target.closest('.t')){bb.parentElement.classList.toggle('full');}
     const t=e.target.closest('.m-head .t');
     if(t&&state.audioEl){const m=msgById(t.dataset.mid);if(m&&m.audio_sec!=null){state.audioEl.currentTime=m.audio_sec;state.audioEl.play().catch(()=>{});}}

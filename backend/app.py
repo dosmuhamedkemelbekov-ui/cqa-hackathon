@@ -125,6 +125,7 @@ def conversation(conv_id: str):
         "audio_page": conv.get("audio_url"),
         "messages": prepared["messages"],
         "facts": prepared["facts"],
+        "profile": preprocess.compute_profile(prepared["messages"], prepared["is_voice"]),
         "evaluation": db.latest_evaluation(conv_id),
         "history": db.evaluation_history(conv_id),
         "appeals": db.list_appeals(conversation_id=conv_id),
