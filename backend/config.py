@@ -1,5 +1,6 @@
 """Настройки приложения. Читаются из переменных окружения или файла .env в корне проекта."""
 import os
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -9,12 +10,20 @@ def _load_dotenv() -> None:
     env = ROOT / ".env"
     if not env.exists():
         return
-    for line in env.read_text(encoding="utf-8").splitlines():
+    values: dict[str, str] = {}
+    for line in env.read_text(encoding="utf-8-sig").splitlines():
         line = line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, _, value = line.partition("=")
-        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+        value = value.strip()
+        if value[:1] in ('"', "'") and value[:1] in value[1:]:
+            value = value[1:value.index(value[0], 1)]       # значение в кавычках
+        else:
+            value = re.split(r"\s+#", value, maxsplit=1)[0].strip()  # «значение   # комментарий»
+        values[key.strip()] = value  # при повторе ключа в .env побеждает последняя строка
+    for key, value in values.items():
+        os.environ.setdefault(key, value)  # переменные окружения процесса важнее .env
 
 
 _load_dotenv()
