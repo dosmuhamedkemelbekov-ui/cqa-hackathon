@@ -549,6 +549,15 @@ h1,h2,h3,h4,.ttl,.t-head h2{font-family:var(--font-h);letter-spacing:-.01em}
 
 /* дорожки речи (как в макете: Клиент / Оператор) */
 #pfBody.hidden{display:none}
+.q-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;padding:14px 18px 0}
+.q-m{border:1px solid var(--n30);border-radius:8px;padding:10px 12px;background:linear-gradient(180deg,var(--g50),#fff)}
+.q-m.wide{grid-column:span 2}@media (max-width:900px){.q-m.wide{grid-column:auto}}
+.q-k{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--n80)}
+.q-v{font-size:14px;margin-top:2px}.q-v b{font-size:24px;color:var(--g700)}
+.q-s{font-size:11.5px;color:var(--n80);margin-top:2px}
+.q-note{font-size:12px;color:var(--n80);margin:10px 18px}
+.q-risk{display:inline-block;min-width:44px;text-align:center;font-weight:700;font-size:12px;padding:2px 6px;border-radius:10px;
+  background:linear-gradient(90deg,rgba(196,49,75,.18) var(--w),var(--n20) var(--w));color:var(--n100)}
 .pf{padding:8px 18px 10px;border-bottom:1px solid var(--n30);background:#fff}
 .pf-toggle{display:flex;align-items:baseline;gap:8px;width:100%;background:none;border:0;padding:2px 0;text-align:left;color:var(--n100)}
 .pf-toggle b{font-size:12.5px}.pf-toggle span{font-size:11px;color:var(--n80)}.pf-chev{margin-left:auto;transition:transform .2s}
@@ -1076,7 +1085,7 @@ function filterDefs(){
     {key:'status',label:'Статус',opts:[['all','Все'],['Не оценено','Не оценено'],['Оценено','Оценено'],['Апелляция','Апелляция'],['Пересмотрено','Пересмотрено'],['Грубая ошибка','Грубая ошибка']]}
   ];
 }
-const SORTS=[['default','Порядок загрузки'],['attention','Сначала требующие внимания'],['score_asc','Балл: сначала низкие'],['score_desc','Балл: сначала высокие'],['id','По ID']];
+const SORTS=[['default','Порядок загрузки'],['attention','Очередь проверки (по риску)'],['score_asc','Балл: сначала низкие'],['score_desc','Балл: сначала высокие'],['id','По ID']];
 function countBy(key,val){
   return state.list.filter(d=>key==='dataset'?d.dataset===val:key==='channel'?chan(d.channel)===val:key==='lang'?d.language===val:statusIs(d,val)).length;
 }
@@ -1094,6 +1103,7 @@ function renderFilters(){
 }
 function statusIs(d,val){return val==='Грубая ошибка'?!!(d.evaluation&&d.evaluation.gross_error):d.status===val;}
 function attention(d){
+  if(d.risk!=null)return d.risk;  // риск считает сервер (review_queue.py)
   if(!d.evaluation)return 3;
   let s=0;if(d.open_appeals)s+=10;if(d.evaluation.gross_error)s+=8;if(d.evaluation.errors&&d.evaluation.errors.length)s+=6;if(d.evaluation.stale)s+=2;
   return s+(100-(d.evaluation.total||0))/100;
@@ -1826,7 +1836,7 @@ async function renderStatsInner(){
   const cl=state.checklist,ev=state.list.filter(d=>d.evaluation);
   const avg=a=>a.length?a.reduce((s,x)=>s+(x||0),0)/a.length:null;
   const byLang={};ev.forEach(d=>{(byLang[d.language]=byLang[d.language]||[]).push(d.evaluation.total);});
-  let html=(await grossCard())+'<div class="card"><header><h2>Сводка по оценкам</h2><p>Активный чек-лист: '+esc(cl.name)+' v'+cl.version+'</p></header><div class="stat-grid">'+
+  let html=(await queueCard())+(await grossCard())+'<div class="card"><header><h2>Сводка по оценкам</h2><p>Активный чек-лист: '+esc(cl.name)+' v'+cl.version+'</p></header><div class="stat-grid">'+
     '<div class="stat"><div class="n">Оценено</div><div class="v">'+ev.length+' / '+state.list.length+'</div></div>'+
     '<div class="stat"><div class="n">Средний балл</div><div class="v">'+fmt(avg(ev.map(d=>d.evaluation.total)))+'</div></div>'+
     Object.keys(byLang).sort().map(l=>'<div class="stat"><div class="n">'+esc(l)+'</div><div class="v">'+fmt(avg(byLang[l]))+'</div><div class="s">'+byLang[l].length+' диалогов</div></div>').join('')+
@@ -1850,6 +1860,33 @@ async function renderStatsInner(){
   html+='</div>';
   html+=resultsCard();
   pane.innerHTML=html;
+}
+/* ОЧЕРЕДЬ ПРОВЕРКИ: в каком порядке супервизору смотреть диалоги + честный замер по эталону */
+async function queueCard(){
+  const ds=state.filters.dataset!=='all'?state.filters.dataset:(state.datasets.indexOf('DEV')>=0?'DEV':'');
+  let q;try{q=await api('/review-queue'+(ds?'?dataset='+encodeURIComponent(ds):''));}catch(e){return '';}
+  if(!q.rows||!q.rows.length)return '';
+  const m=q.metrics||{},truth=m.truth||{};
+  const n=v=>String(v).replace('.',',');
+  let metrics='';
+  if(m.n){
+    metrics='<div class="q-metrics">'+(m.k||[]).map(k=>'<div class="q-m"><div class="q-k">Топ-'+k.k+'</div><div class="q-v"><b>'+k.ours+'</b> / '+k.k+'</div><div class="q-s">реальных проблем · случайно ≈ '+n(k.random)+' · по баллу ИИ '+k.score_only+'</div></div>').join('')+
+      (m.all_found_at?'<div class="q-m wide"><div class="q-k">Найти все '+m.problems+' проблем</div><div class="q-v"><b>'+m.all_found_at+'</b> из '+m.n+' просмотров</div><div class="q-s">по баллу ИИ — '+m.all_found_score_only+', в случайном порядке — ≈ '+m.all_found_random+'</div></div>':'')+'</div>'+
+      '<p class="q-note">Замер по эталону DEV ('+m.n+' диалогов): «реальная проблема» — грубая ошибка или итог ниже '+m.threshold+' по эталону ('+m.problems+' шт.). Веса риска заданы заранее и не подбирались под эталон.</p>';
+  }
+  const rows=q.rows.slice(0,10).map(r=>{
+    const t=truth[r.conversation_id];
+    return '<tr><td class="num">'+r.rank+'</td><td><a href="#" class="go-q" data-id="'+esc(r.conversation_id)+'"><b>'+esc(r.conversation_id)+'</b></a></td>'+
+      '<td><span class="q-risk" style="--w:'+Math.min(100,r.risk)+'%">'+Math.round(r.risk)+'</span></td>'+
+      '<td>'+(r.total!=null?fmt(r.total):'—')+(r.gross_error?' <span class="b err">грубая</span>':'')+'</td>'+
+      '<td style="font-size:12px">'+esc((r.reasons||[]).slice(0,3).join(' · ')||'—')+'</td>'+
+      (m.n?'<td>'+(t?(t.problem?'<span class="b err" title="По эталону">проблема: '+esc(t.why)+'</span>':'<span class="b ok">в норме</span>'):'—')+'</td>':'')+'</tr>';
+  }).join('');
+  return '<div class="card q-card"><header><h2>Очередь проверки: что смотреть первым</h2>'+
+    '<p>Система ничего не пропускает — только сортирует: сначала рискованные диалоги, в конце безопасные. Если эксперт не успел дойти до конца, он не посмотрел самое безопасное.</p></header>'+
+    metrics+
+    '<div class="tbl-wrap"><table class="t" style="min-width:640px"><thead><tr><th>№</th><th>Диалог</th><th>Риск</th><th>Итог ИИ</th><th>Почему в начале очереди</th>'+(m.n?'<th>Эталон</th>':'')+'</tr></thead><tbody>'+rows+'</tbody></table></div>'+
+    '<div class="set-foot"><button class="btn primary" id="qOpenList">Открыть очередь в списке диалогов</button><span class="q-note" style="margin:0">Сортировка «Очередь проверки (по риску)»</span></div></div>';
 }
 function resultsCard(){
   const ds=state.datasets||[];
@@ -2370,6 +2407,8 @@ function bind(){
   });
   /* сводка */
   $('#statsPane').addEventListener('click',e=>{
+    const gq=e.target.closest('.go-q');if(gq){e.preventDefault();setView('dialogs');selectDialog(gq.dataset.id,true);return;}
+    if(e.target.closest('#qOpenList')){state.filters.sort='attention';setView('dialogs');renderFilters();renderList();renderListActions();const f=filtered()[0];if(f)selectDialog(f.conversation_id,true);return;}
     const og=e.target.closest('[data-open-gross]');
     if(og){setView('dialogs');selectDialog(og.dataset.openGross,true).then(()=>openCriterion(og.dataset.cid));return;}
     const sv=e.target.closest('#resSave');

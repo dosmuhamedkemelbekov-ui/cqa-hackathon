@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import config, dataset, db, evaluator, intake, llm, preprocess, results_export, scoring
+from . import config, dataset, db, evaluator, intake, llm, preprocess, results_export, review_queue, scoring
 
 app = FastAPI(title="CQA — Conversation Quality Analytics")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -99,6 +99,8 @@ def conversations(dataset: str | None = None):
                 "overridden": bool(ev.get("overrides")),
             }
         it["open_appeals"] = open_appeals.get(it["conversation_id"], 0)
+        if ev:  # риск для сортировки «очередь проверки» (без профиля — быстро)
+            it["risk"], it["risk_reasons"] = review_queue.risk(ev, None, it["open_appeals"])
         if not ev:
             it["status"] = "Не оценено"
         elif it["open_appeals"]:
@@ -633,6 +635,19 @@ def _load_gold() -> dict:
 
 class GoldReq(BaseModel):
     answers: dict[str, str]
+
+
+@app.get("/api/review-queue")
+def review_queue_api(dataset: str | None = None, threshold: float = 70):
+    """Очередь проверки по риску + честный замер по эталону: наша очередь vs случайная выборка vs сортировка по баллу."""
+    convs = [db.get_conversation(c["conversation_id"]) for c in db.list_conversations(dataset)]
+    latest = db.latest_evaluations_map()
+    opens: dict[str, int] = {}
+    for a in db.list_appeals(status="open"):
+        opens[a["conversation_id"]] = opens.get(a["conversation_id"], 0) + 1
+    rows = review_queue.build_queue(convs, latest, opens)
+    metrics = review_queue.evaluate_queue(rows, _load_gold(), latest, threshold)
+    return {"rows": rows, "metrics": metrics}
 
 
 @app.get("/api/gold/report")
