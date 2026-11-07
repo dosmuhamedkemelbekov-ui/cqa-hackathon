@@ -4,6 +4,9 @@
 Остальной код вызывает только complete_json() и не зависит от провайдера."""
 import asyncio
 import json
+import re
+import sys
+import time
 
 from openai import APIConnectionError, APIStatusError, AsyncOpenAI, BadRequestError, RateLimitError
 
@@ -11,6 +14,8 @@ from . import config
 
 _client: AsyncOpenAI | None = None
 _sem: asyncio.Semaphore | None = None
+# Порядок, в котором снимаем параметры при «немой» ошибке 400.
+_OPTIONAL_ORDER = ("prompt_cache_breakpoint", "prompt_cache_key", "seed", "json_schema", "temperature")
 # Некоторые модели (reasoning) не принимают temperature/seed или json_schema — запоминаем и больше не шлём.
 _unsupported: set[str] = set()
 
@@ -42,14 +47,6 @@ async def rate_limit() -> None:
         await asyncio.sleep(wait)
 
 
-def _retry_after(e) -> float | None:
-    try:
-        v = e.response.headers.get("retry-after")
-        return float(v) if v else None
-    except Exception:  # noqa: BLE001
-        return None
-
-
 def semaphore() -> asyncio.Semaphore:
     global _sem
     if _sem is None:
@@ -68,6 +65,26 @@ def provider_info() -> dict:
         return {"provider": "anthropic", "model": config.CLAUDE_MODEL, "base_url": config.ANTHROPIC_BASE_URL,
                 "effort": config.CLAUDE_EFFORT}
     return {"provider": "openai", "model": config.LLM_MODEL, "base_url": config.LLM_BASE_URL or "https://api.openai.com/v1"}
+
+
+def log(text: str) -> None:
+    """Короткое сообщение в консоль сервера: видно, что происходит с запросами к модели."""
+    print(f"[LLM {time.strftime('%H:%M:%S')}] {text}", file=sys.stderr, flush=True)
+
+
+def _retry_in_text(msg: str) -> float | None:
+    """Gemini пишет паузу в теле: «retry in 35.2s» или "retryDelay": "35s"."""
+    m = re.search(r"retry in ([\d.]+)\s*s", msg) or re.search(r'retrydelay"?\s*:\s*"?([\d.]+)s', msg)
+    return min(90.0, float(m.group(1)) + 1) if m else None
+
+
+def _retry_after(e: Exception) -> float | None:
+    """Пауза из заголовка retry-after (сек), если провайдер её прислал."""
+    try:
+        v = e.response.headers.get("retry-after")  # type: ignore[attr-defined]
+        return min(90.0, float(v)) if v else None
+    except Exception:  # noqa: BLE001
+        return None
 
 
 def _usage(resp) -> dict:
@@ -109,8 +126,14 @@ async def _complete_openai(system: str, user: str, schema: dict, name: str, mode
     """Возвращает (распарсенный JSON, usage). Строгая JSON Schema; при отказе модели — json_object."""
     model = model or config.LLM_MODEL
     last_err: Exception | None = None
-    attempts = 7 if config.LLM_RPM > 0 else 4  # бесплатные тарифы: терпеливее к 429
-    for attempt in range(attempts):
+    rate_waits = 0
+    attempt = 0
+    if config.LLM_BASE_URL and "api.openai.com" not in config.LLM_BASE_URL:
+        _unsupported.update({"prompt_cache_breakpoint", "prompt_cache_key"})
+        if "generativelanguage.googleapis.com" in config.LLM_BASE_URL:
+            _unsupported.add("seed")  # Gemini не принимает seed — не тратим запрос на пробу
+    while attempt < 4:
+        attempt += 1
         kwargs: dict = {
             "model": model,
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
@@ -150,7 +173,7 @@ async def _complete_openai(system: str, user: str, schema: dict, name: str, mode
             # Параметр, который модель не принимает, запоминаем и повторяем без него.
             # Проверяем по тому, что было отправлено в ЭТОМ запросе: параллельные вызовы
             # могли уже пометить параметр, но им тоже нужен повтор.
-            msg = str(e).lower()
+            msg = (str(e) + " " + json.dumps(getattr(e, "body", None), ensure_ascii=False, default=str)).lower()
             sent = {p for p in ("temperature", "seed", "prompt_cache_key") if p in kwargs}
             if isinstance(kwargs["messages"][1]["content"], list):
                 sent.add("prompt_cache_breakpoint")
@@ -160,20 +183,40 @@ async def _complete_openai(system: str, user: str, schema: dict, name: str, mode
                    if p in msg and p in sent}
             if "json_schema" in sent and ("json_schema" in msg or "response_format" in msg):
                 hit.add("json_schema")
+            if not hit:
+                # Некоторые провайдеры (Gemini, Groq) не называют параметр в ошибке 400:
+                # снимаем необязательные параметры по одному, от самого специфичного для OpenAI.
+                hit = {next((p for p in _OPTIONAL_ORDER if p in sent), "")} - {""}
             last_err = e
             if not hit:
-                raise
+                raise RuntimeError(f"Провайдер отклонил запрос (400): {msg[:400]}") from e
             _unsupported.update(hit)
+            log(f"провайдер не принял параметры {sorted(hit)} — повторяю без них")
+            attempt -= 1  # снятие параметра не тратит попытку
         except RateLimitError as e:
-            # Закончились кредиты — повторять бессмысленно, сразу понятная ошибка.
-            msg = str(e).lower()
-            if any(s in msg for s in ("insufficient_quota", "no credits", "exceeded your current quota")) and "per day" not in msg \
-                    and "perday" not in msg and config.LLM_RPM <= 0:
-                raise RuntimeError("На ключе закончились кредиты/квота — пополните баланс или смените провайдера") from e
-            if "per day" in msg or "perday" in msg or "requests per day" in msg:
-                raise RuntimeError("Исчерпан дневной лимит бесплатного тарифа — продолжите завтра или смените ключ/модель") from e
+            # Gemini и др. кладут причину в тело ответа, а не в текст исключения.
+            msg = (str(e) + " " + json.dumps(getattr(e, "body", None), ensure_ascii=False, default=str)).lower()
+            # Закончились кредиты (OpenAI) — повторять бессмысленно, сразу понятная ошибка.
+            if any(s in msg for s in ("insufficient_quota", "no credits", "credit_balance")) or (
+                    not config.LLM_BASE_URL and "exceeded your current quota" in msg):
+                raise RuntimeError("На ключе закончились кредиты — пополните баланс или смените провайдера в .env") from e
+            # Модель недоступна на бесплатном тарифе (лимит 0).
+            if re.search(r"limit:\s*0\b", msg):
+                raise RuntimeError(f"Модель {model} недоступна на бесплатном тарифе (лимит 0) — "
+                                   f"укажите другую в CQA_MODEL. {msg[:300]}") from e
+            # Дневной лимит бесплатного тарифа — до завтра не пройдёт.
+            if any(s in msg for s in ("per day", "perday", "requests per day", "tokens per day", "free-models-per-day")):
+                raise RuntimeError(f"Исчерпан дневной лимит бесплатного тарифа для {model}: {msg[:300]}") from e
+            # Поминутный лимит: ждём, сколько просит сервер, и повторяем.
+            rate_waits += 1
+            if rate_waits > config.LLM_RATE_RETRIES:
+                raise RuntimeError(f"Лимит запросов провайдера не освободился: {msg[:300]}") from e
+            wait = _retry_after(e) or _retry_in_text(msg) or min(30.0, 5.0 * rate_waits)
+            log(f"лимит запросов {model}: жду {wait:.0f} с (повтор {rate_waits}/{config.LLM_RATE_RETRIES})")
             last_err = e
-            await asyncio.sleep(min(60.0, _retry_after(e) or 5 * (attempt + 1)))
+            await asyncio.sleep(wait)
+            attempt -= 1  # ожидание лимита не тратит попытки на исправление параметров
+            continue
         except APIConnectionError as e:
             last_err = e
             await asyncio.sleep(2 * (attempt + 1))

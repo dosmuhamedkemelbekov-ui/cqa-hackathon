@@ -4,7 +4,7 @@ import json
 import uuid
 from typing import Any
 
-from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -17,6 +17,7 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 db.init()
 
 JOBS: dict[str, dict] = {}
+_TASKS: set = set()  # ссылки на фоновые задачи, чтобы их не собрал сборщик мусора
 
 
 # ---------------- служебное ----------------
@@ -43,12 +44,19 @@ class FetchReq(BaseModel):
 
 @app.post("/api/datasets/fetch")
 async def fetch_dataset(req: FetchReq):
+    gid = req.group_id.strip()
+    source = "api"
     try:
-        ds, records = await dataset.fetch_group(req.group_id.strip())
+        ds, records = await dataset.fetch_group(gid)
     except Exception as e:  # noqa: BLE001
-        raise HTTPException(502, f"Не удалось получить набор: {e}")
+        # DEV есть в репозитории (data/dev.json): если API организаторов недоступен, берём его оттуда.
+        local = config.ROOT / "data" / "dev.json"
+        if gid.upper() != "DEV" or not local.exists():
+            raise HTTPException(502, f"Не удалось получить набор «{gid}» из API организаторов: {e}")
+        ds, records = dataset.parse_payload(json.loads(local.read_text(encoding="utf-8-sig")))
+        ds, source = ds or "DEV", "file"
     n = db.upsert_conversations(records, ds)
-    return {"dataset": ds, "loaded": n}
+    return {"dataset": ds, "loaded": n, "source": source}
 
 
 @app.post("/api/datasets/upload")
@@ -323,8 +331,10 @@ async def _run_job(job_id: str, conv_ids: list[str], cl: dict, samples: int | No
             job["llm_calls"] += ev["llm_calls"]
             job["results"].append({"conversation_id": cid, "before": ev.get("previous_total"),
                                    "after": ev["final_score"]["total"], "ai_after": ev["original_score"]["total"]})
+            llm.log(f"✔ {cid}: {ev['final_score']['total']} ({job['done'] + 1}/{job['total']}, {ev['duration_s']} с)")
         except Exception as e:  # noqa: BLE001
             job["failed"].append({"conversation_id": cid, "error": str(e)})
+            llm.log(f"✘ {cid}: {str(e)[:300]}")
         finally:
             job["done"] += 1
 
@@ -336,12 +346,14 @@ async def _run_job(job_id: str, conv_ids: list[str], cl: dict, samples: int | No
         async with sem:
             await one(cid)
 
-    await asyncio.gather(*[limited(c) for c in conv_ids])
-    job["status"] = "finished"
+    try:
+        await asyncio.gather(*[limited(c) for c in conv_ids])
+    finally:
+        job["status"] = "finished"
 
 
 @app.post("/api/evaluate")
-async def evaluate_batch(req: EvalReq, background: BackgroundTasks):
+async def evaluate_batch(req: EvalReq):
     if not llm.is_configured():
         raise HTTPException(400, "LLM не настроена: задайте OPENAI_API_KEY (или OPENAI_BASE_URL) в .env")
     cl = _checklist_for(req.checklist_id)
@@ -355,7 +367,10 @@ async def evaluate_batch(req: EvalReq, background: BackgroundTasks):
     job_id = uuid.uuid4().hex[:8]
     JOBS[job_id] = {"id": job_id, "status": "running", "total": len(ids), "done": 0, "failed": [], "cost_usd": 0.0,
                     "llm_calls": 0, "results": [], "checklist": f"{cl['name']} v{cl['version']}"}
-    background.add_task(_run_job, job_id, ids, cl, req.samples, req.reuse)
+    # Отдельная задача в цикле событий: ответ уходит сразу, опрос /api/jobs не ждёт окончания оценки.
+    task = asyncio.create_task(_run_job(job_id, ids, cl, req.samples, req.reuse))
+    _TASKS.add(task)
+    task.add_done_callback(_TASKS.discard)
     return JOBS[job_id]
 
 
@@ -523,6 +538,31 @@ def review(ev_id: int, req: ReviewReq):
     if not ev:
         raise HTTPException(404, "Оценка не найдена")
     return _apply_review(ev, req.criterion_id, req.new_answer, req.reason, req.reviewer)
+
+
+# ---------------- грубые ошибки: все диалоги с флагом и объяснением ----------------
+@app.get("/api/gross")
+def gross(dataset: str | None = None):
+    latest = db.latest_evaluations_map()
+    rows = []
+    for c in db.list_conversations(dataset):
+        ev = latest.get(c["conversation_id"])
+        if not ev or not ev["final_score"].get("gross_error"):
+            continue
+        flag = next((x for x in ev["checklist_snapshot"]["criteria"] if x["type"] == "flag"), None)
+        if not flag:
+            continue
+        item = next((i for i in ev["criteria"] if i["criterion_id"] == flag["id"]), {})
+        dec = [d for d in ev.get("decisions", []) if d["criterion_id"] == flag["id"]]
+        by_sup = bool(dec and dec[-1]["to"] == "yes" and ev["original_answers"].get(flag["id"]) != "yes")
+        rows.append({
+            "conversation_id": c["conversation_id"], "language": c.get("language"), "channel": c.get("channel"),
+            "total": ev["final_score"]["total"], "criterion_id": flag["id"],
+            "rationale": dec[-1]["reason"] if by_sup else item.get("rationale", ""),
+            "evidence": [{"msg_id": e.get("msg_id"), "quote": e.get("quote", "")} for e in item.get("evidence") or []],
+            "by_supervisor": by_sup,
+        })
+    return rows
 
 
 # ---------------- экспорт ----------------
