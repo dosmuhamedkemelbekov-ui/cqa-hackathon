@@ -40,6 +40,8 @@ LLM_CONCURRENCY = int(os.getenv("CQA_CONCURRENCY", "16"))
 DIALOG_CONCURRENCY = int(os.getenv("CQA_DIALOG_CONCURRENCY", "4"))
 # Сколько независимых прогонов на критерий (голосование большинством / медиана). 1 — быстрее и дешевле.
 LLM_SAMPLES = int(os.getenv("CQA_SAMPLES", "1"))
+# Сколько раз ждать и повторять при поминутном лимите (429) бесплатных тарифов.
+LLM_RATE_RETRIES = int(os.getenv("CQA_RATE_RETRIES", "8"))
 # Самопроверка: рискованные ответы (Нет, N/A, неполный балл, грубая ошибка, низкая уверенность)
 # перепроверяет независимый «контролёр» и исправляет ошибку. 0 — выключить.
 LLM_VERIFY = os.getenv("CQA_VERIFY", "1") not in ("0", "false", "no")

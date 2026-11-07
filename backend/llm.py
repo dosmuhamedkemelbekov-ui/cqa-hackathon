@@ -42,6 +42,15 @@ def provider_info() -> dict:
     return {"provider": "openai", "model": config.LLM_MODEL, "base_url": config.LLM_BASE_URL or "https://api.openai.com/v1"}
 
 
+def _retry_after(e: Exception) -> float | None:
+    """Пауза из заголовка retry-after (сек), если провайдер её прислал."""
+    try:
+        v = e.response.headers.get("retry-after")  # type: ignore[attr-defined]
+        return min(90.0, float(v)) if v else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def _usage(resp) -> dict:
     u = resp.usage
     if not u:
@@ -81,7 +90,10 @@ async def _complete_openai(system: str, user: str, schema: dict, name: str, mode
     """Возвращает (распарсенный JSON, usage). Строгая JSON Schema; при отказе модели — json_object."""
     model = model or config.LLM_MODEL
     last_err: Exception | None = None
-    for attempt in range(4):
+    rate_waits = 0
+    attempt = 0
+    while attempt < 4:
+        attempt += 1
         kwargs: dict = {
             "model": model,
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
@@ -135,11 +147,23 @@ async def _complete_openai(system: str, user: str, schema: dict, name: str, mode
                 raise
             _unsupported.update(hit)
         except RateLimitError as e:
-            # Закончились кредиты — повторять бессмысленно, сразу понятная ошибка.
-            if any(s in str(e).lower() for s in ("insufficient_quota", "no credits", "exceeded your current quota")):
-                raise RuntimeError("На ключе OpenAI закончились кредиты — пополните баланс в platform.openai.com") from e
+            msg = str(e).lower()
+            # Закончились кредиты (OpenAI) — повторять бессмысленно, сразу понятная ошибка.
+            if any(s in msg for s in ("insufficient_quota", "no credits", "credit_balance")) or (
+                    not config.LLM_BASE_URL and "exceeded your current quota" in msg):
+                raise RuntimeError("На ключе закончились кредиты — пополните баланс или смените провайдера в .env") from e
+            # Дневной лимит бесплатного тарифа (Gemini/Groq/OpenRouter) — до завтра не пройдёт.
+            if any(s in msg for s in ("per day", "perday", "requests per day", "tokens per day", "free-models-per-day")):
+                raise RuntimeError(f"Исчерпан дневной лимит бесплатного тарифа: {str(e)[:200]}") from e
+            # Поминутный лимит: ждём, сколько просит сервер (или нарастающую паузу), и повторяем.
+            rate_waits += 1
+            if rate_waits > config.LLM_RATE_RETRIES:
+                raise RuntimeError(f"Лимит запросов провайдера не освободился: {str(e)[:200]}") from e
+            wait = _retry_after(e) or min(60.0, 5.0 * rate_waits)
             last_err = e
-            await asyncio.sleep(2 * (attempt + 1))
+            await asyncio.sleep(wait)
+            attempt -= 1  # ожидание лимита не тратит попытки на исправление параметров
+            continue
         except APIConnectionError as e:
             last_err = e
             await asyncio.sleep(2 * (attempt + 1))
