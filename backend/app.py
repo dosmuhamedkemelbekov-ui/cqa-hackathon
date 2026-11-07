@@ -1,0 +1,455 @@
+"""HTTP API + раздача фронтенда. Запуск: python -m uvicorn backend.app:app --port 8000"""
+import asyncio
+import json
+import uuid
+from typing import Any
+
+from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+
+from . import config, dataset, db, evaluator, llm, preprocess, scoring
+
+app = FastAPI(title="CQA — Conversation Quality Analytics")
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+db.init()
+
+JOBS: dict[str, dict] = {}
+
+
+# ---------------- служебное ----------------
+@app.get("/api/health")
+def health():
+    return {
+        "ok": True,
+        "llm_configured": llm.is_configured(),
+        "model": config.LLM_MODEL,
+        "base_url": config.LLM_BASE_URL or "https://api.openai.com/v1",
+        "samples": config.LLM_SAMPLES,
+    }
+
+
+# ---------------- наборы и диалоги ----------------
+class FetchReq(BaseModel):
+    group_id: str
+
+
+@app.post("/api/datasets/fetch")
+async def fetch_dataset(req: FetchReq):
+    try:
+        ds, records = await dataset.fetch_group(req.group_id.strip())
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(502, f"Не удалось получить набор: {e}")
+    n = db.upsert_conversations(records, ds)
+    return {"dataset": ds, "loaded": n}
+
+
+@app.post("/api/datasets/upload")
+async def upload_dataset(file: UploadFile = File(...), name: str | None = None):
+    try:
+        payload = json.loads((await file.read()).decode("utf-8-sig"))
+        ds, records = dataset.parse_payload(payload)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(400, f"Файл не распознан: {e}")
+    ds = name or ds or (file.filename or "UPLOAD").rsplit(".", 1)[0]
+    return {"dataset": ds, "loaded": db.upsert_conversations(records, ds)}
+
+
+@app.get("/api/datasets")
+def datasets():
+    return db.list_datasets()
+
+
+@app.get("/api/conversations")
+def conversations(dataset: str | None = None):
+    items = db.list_conversations(dataset)
+    active = db.active_checklist()
+    latest = db.latest_evaluations_map()
+    open_appeals: dict[str, int] = {}
+    for a in db.list_appeals(status="open"):
+        open_appeals[a["conversation_id"]] = open_appeals.get(a["conversation_id"], 0) + 1
+    for it in items:
+        ev = latest.get(it["conversation_id"])
+        if ev:
+            it["evaluation"] = {
+                "id": ev["id"],
+                "total": ev["final_score"]["total"],
+                "original_total": ev["original_score"]["total"],
+                "gross_error": ev["final_score"]["gross_error"],
+                "checklist_id": ev["checklist_id"],
+                "checklist_version": ev["checklist_version"],
+                "stale": ev["checklist_id"] != active["id"] or ev["checklist_version"] != active["version"],
+                "answers": ev["final_answers"],
+                "errors": ev.get("errors", []),
+                "overridden": bool(ev.get("overrides")),
+            }
+        it["open_appeals"] = open_appeals.get(it["conversation_id"], 0)
+    return items
+
+
+@app.get("/api/conversations/{conv_id}")
+def conversation(conv_id: str):
+    conv = db.get_conversation(conv_id)
+    if not conv:
+        raise HTTPException(404, "Диалог не найден")
+    prepared = preprocess.prepare(conv)
+    return {
+        "conversation_id": conv_id,
+        "dataset": conv.get("dataset"),
+        "channel": conv.get("channel"),
+        "language": conv.get("language"),
+        "has_audio": bool(conv.get("audio_url")),
+        "audio_page": conv.get("audio_url"),
+        "messages": prepared["messages"],
+        "facts": prepared["facts"],
+        "evaluation": db.latest_evaluation(conv_id),
+        "history": db.evaluation_history(conv_id),
+        "appeals": db.list_appeals(conversation_id=conv_id),
+    }
+
+
+@app.get("/api/conversations/{conv_id}/audio")
+async def audio(conv_id: str):
+    conv = db.get_conversation(conv_id)
+    if not conv or not conv.get("audio_url"):
+        raise HTTPException(404, "У диалога нет записи")
+    try:
+        url = await dataset.resolve_audio(conv["audio_url"])
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(502, f"Не удалось получить запись: {e}")
+    return RedirectResponse(url, status_code=302)
+
+
+# ---------------- чек-листы ----------------
+def _validate_checklist(cl: dict) -> dict:
+    if not cl.get("id") or not cl.get("name"):
+        raise HTTPException(400, "У чек-листа должны быть id и name")
+    crits = cl.get("criteria") or []
+    if not crits:
+        raise HTTPException(400, "Добавьте хотя бы один критерий")
+    seen = set()
+    section_ids = {s["id"] for s in cl.get("sections") or []}
+    for c in crits:
+        if not c.get("id") or c["id"] in seen:
+            raise HTTPException(400, f"Пустой или повторяющийся id критерия: {c.get('id')}")
+        seen.add(c["id"])
+        if c.get("type") not in ("binary", "scale", "flag"):
+            raise HTTPException(400, f"{c['id']}: тип должен быть binary, scale или flag")
+        if not c.get("name") or not c.get("rule"):
+            raise HTTPException(400, f"{c['id']}: заполните название и правило")
+        c["weight"] = float(c.get("weight") or 0) if c["type"] != "flag" else 0
+        if c["weight"] < 0:
+            raise HTTPException(400, f"{c['id']}: вес не может быть отрицательным")
+        if c["type"] == "scale":
+            scale = c.get("scale") or []
+            if len(scale) < 2:
+                raise HTTPException(400, f"{c['id']}: у шкалы должно быть минимум две ступени")
+            for s in scale:
+                s["value"] = float(s["value"])
+                if s["value"].is_integer():
+                    s["value"] = int(s["value"])
+        if c.get("section") and section_ids and c["section"] not in section_ids:
+            raise HTTPException(400, f"{c['id']}: неизвестная секция {c['section']}")
+    weight_sum = sum(c["weight"] for c in crits)
+    if weight_sum <= 0:
+        raise HTTPException(400, "Сумма весов должна быть больше нуля")
+    return cl
+
+
+@app.get("/api/checklists")
+def checklists():
+    active = db.get_setting("active_checklist")
+    return [{**c, "active": c["id"] == active, "versions": db.checklist_versions(c["id"])} for c in db.list_checklists()]
+
+
+@app.get("/api/checklists/{cl_id}")
+def checklist(cl_id: str, version: int | None = None):
+    cl = db.get_checklist(cl_id, version)
+    if not cl:
+        raise HTTPException(404, "Чек-лист не найден")
+    return cl
+
+
+@app.post("/api/checklists")
+def save_checklist(cl: dict[str, Any], activate: bool = True):
+    cl = _validate_checklist({k: v for k, v in cl.items() if k not in ("version", "saved_at", "active", "versions")})
+    saved = db.save_checklist(cl)
+    if activate:
+        db.set_setting("active_checklist", saved["id"])
+    return saved
+
+
+@app.post("/api/checklists/{cl_id}/activate")
+def activate_checklist(cl_id: str):
+    if not db.get_checklist(cl_id):
+        raise HTTPException(404, "Чек-лист не найден")
+    db.set_setting("active_checklist", cl_id)
+    return {"active": cl_id}
+
+
+# ---------------- оценка ----------------
+class EvalReq(BaseModel):
+    conversation_ids: list[str] | None = None
+    dataset: str | None = None
+    checklist_id: str | None = None
+    only_missing: bool = False
+    samples: int | None = None
+
+
+def _checklist_for(req_id: str | None) -> dict:
+    cl = db.get_checklist(req_id) if req_id else db.active_checklist()
+    if not cl:
+        raise HTTPException(404, "Чек-лист не найден")
+    return cl
+
+
+@app.post("/api/evaluate/{conv_id}")
+async def evaluate_one(conv_id: str, checklist_id: str | None = None, samples: int | None = None):
+    if not llm.is_configured():
+        raise HTTPException(400, "LLM не настроена: задайте OPENAI_API_KEY (или OPENAI_BASE_URL для локальной модели) в .env")
+    conv = db.get_conversation(conv_id)
+    if not conv:
+        raise HTTPException(404, "Диалог не найден")
+    ev = await evaluator.evaluate(conv, _checklist_for(checklist_id), samples)
+    return db.save_evaluation(ev)
+
+
+async def _run_job(job_id: str, conv_ids: list[str], cl: dict, samples: int | None):
+    job = JOBS[job_id]
+
+    async def one(cid: str):
+        try:
+            conv = db.get_conversation(cid)
+            ev = await evaluator.evaluate(conv, cl, samples)
+            db.save_evaluation(ev)
+            job["cost_usd"] += ev["cost_usd"]
+        except Exception as e:  # noqa: BLE001
+            job["failed"].append({"conversation_id": cid, "error": str(e)})
+        finally:
+            job["done"] += 1
+
+    # Диалоги параллельно; общий лимит запросов к LLM держит семафор в llm.py.
+    await asyncio.gather(*[one(c) for c in conv_ids])
+    job["status"] = "finished"
+
+
+@app.post("/api/evaluate")
+async def evaluate_batch(req: EvalReq, background: BackgroundTasks):
+    if not llm.is_configured():
+        raise HTTPException(400, "LLM не настроена: задайте OPENAI_API_KEY (или OPENAI_BASE_URL) в .env")
+    cl = _checklist_for(req.checklist_id)
+    ids = req.conversation_ids or [c["conversation_id"] for c in db.list_conversations(req.dataset)]
+    if req.only_missing:
+        latest = db.latest_evaluations_map()
+        ids = [
+            i for i in ids
+            if not (latest.get(i) and latest[i]["checklist_id"] == cl["id"] and latest[i]["checklist_version"] == cl["version"])
+        ]
+    job_id = uuid.uuid4().hex[:8]
+    JOBS[job_id] = {"id": job_id, "status": "running", "total": len(ids), "done": 0, "failed": [], "cost_usd": 0.0,
+                    "checklist": f"{cl['name']} v{cl['version']}"}
+    background.add_task(_run_job, job_id, ids, cl, req.samples)
+    return JOBS[job_id]
+
+
+@app.get("/api/jobs/{job_id}")
+def job(job_id: str):
+    if job_id not in JOBS:
+        raise HTTPException(404, "Задача не найдена")
+    return JOBS[job_id]
+
+
+@app.get("/api/evaluations/{ev_id}")
+def evaluation(ev_id: int):
+    ev = db.get_evaluation(ev_id)
+    if not ev:
+        raise HTTPException(404, "Оценка не найдена")
+    return ev
+
+
+# ---------------- апелляции ----------------
+class AppealReq(BaseModel):
+    evaluation_id: int
+    criterion_id: str
+    comment: str
+    requested_answer: str | None = None
+    author: str | None = "Оператор"
+
+
+class DecisionReq(BaseModel):
+    decision: str  # confirm | change
+    new_answer: str | None = None
+    reason: str
+    reviewer: str | None = "Проверяющий"
+
+
+@app.post("/api/appeals")
+def create_appeal(req: AppealReq):
+    ev = db.get_evaluation(req.evaluation_id)
+    if not ev:
+        raise HTTPException(404, "Оценка не найдена")
+    item = next((c for c in ev["criteria"] if c["criterion_id"] == req.criterion_id), None)
+    if not item:
+        raise HTTPException(404, "Критерий не найден в оценке")
+    if not req.comment.strip():
+        raise HTTPException(400, "Добавьте комментарий")
+    if any(a["status"] == "open" and a["criterion_id"] == req.criterion_id and a["evaluation_id"] == ev["id"]
+           for a in db.list_appeals(conversation_id=ev["conversation_id"])):
+        raise HTTPException(409, "По этому критерию уже есть открытая апелляция")
+    data = {
+        "comment": req.comment.strip(),
+        "author": req.author,
+        "requested_answer": req.requested_answer,
+        "criterion_name": item["name"],
+        "disputed_answer": ev["final_answers"].get(req.criterion_id),
+        "disputed_answer_label": item.get("final_answer_label") or item["answer_label"],
+        "total_before": ev["final_score"]["total"],
+    }
+    return db.create_appeal(ev["id"], ev["conversation_id"], req.criterion_id, data)
+
+
+@app.get("/api/appeals")
+def appeals(status: str | None = None):
+    out = []
+    for a in db.list_appeals(status=status):
+        ev = db.get_evaluation(a["evaluation_id"])
+        item = next((c for c in ev["criteria"] if c["criterion_id"] == a["criterion_id"]), None) if ev else None
+        crit = next((c for c in ev["checklist_snapshot"]["criteria"] if c["id"] == a["criterion_id"]), None) if ev else None
+        out.append({**a, "criterion": item, "criterion_def": crit,
+                    "allowed_answers": scoring.allowed_answers(crit) if crit else []})
+    return out
+
+
+@app.post("/api/appeals/{appeal_id}/decision")
+def decide(appeal_id: int, req: DecisionReq):
+    a = db.get_appeal(appeal_id)
+    if not a:
+        raise HTTPException(404, "Апелляция не найдена")
+    if a["status"] != "open":
+        raise HTTPException(409, "Апелляция уже рассмотрена")
+    if not req.reason.strip():
+        raise HTTPException(400, "Укажите причину решения")
+    ev = db.get_evaluation(a["evaluation_id"])
+    current = ev["final_answers"].get(a["criterion_id"])
+    new_answer = current if req.decision == "confirm" else req.new_answer
+    if new_answer is None:
+        raise HTTPException(400, "Выберите новую оценку")
+    try:
+        ev = evaluator.apply_override(ev, a["criterion_id"], new_answer)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    ev.setdefault("decisions", []).append(
+        {"appeal_id": appeal_id, "criterion_id": a["criterion_id"], "from": current, "to": new_answer,
+         "reason": req.reason.strip(), "reviewer": req.reviewer, "at": db.now()}
+    )
+    db.update_evaluation(ev)
+    data = {**a["data"], "decision": req.decision, "new_answer": new_answer, "reason": req.reason.strip(),
+            "reviewer": req.reviewer, "total_after": ev["final_score"]["total"]}
+    status = "confirmed" if new_answer == current else "changed"
+    return {"appeal": db.resolve_appeal(appeal_id, status, data), "evaluation": ev}
+
+
+# ---------------- экспорт ----------------
+@app.get("/api/export")
+def export(dataset: str | None = None):
+    latest = db.latest_evaluations_map()
+    rows = []
+    for c in db.list_conversations(dataset):
+        ev = latest.get(c["conversation_id"])
+        if not ev:
+            continue
+        rows.append({
+            "conversation_id": c["conversation_id"],
+            "checklist": f"{ev['checklist_id']} v{ev['checklist_version']}",
+            "total": ev["final_score"]["total"],
+            "original_total": ev["original_score"]["total"],
+            "gross_error": ev["final_score"]["gross_error"],
+            "answers": ev["final_answers"],
+            "criteria": [{"id": i["criterion_id"], "name": i["name"], "answer": ev["final_answers"].get(i["criterion_id"]),
+                          "rationale": i["rationale"], "evidence": [e["msg_id"] for e in i["evidence"]]}
+                         for i in ev["criteria"]],
+        })
+    return rows
+
+
+# ---------------- эталонная разметка (для измерения точности) ----------------
+GOLD_PATH = config.ROOT / "gold" / "gold.json"
+
+
+def _load_gold() -> dict:
+    if GOLD_PATH.exists():
+        return json.loads(GOLD_PATH.read_text(encoding="utf-8"))
+    return {}
+
+
+class GoldReq(BaseModel):
+    answers: dict[str, str]
+
+
+@app.get("/api/gold/report")
+def gold_report():
+    return gold_compare(_load_gold(), db.latest_evaluations_map())
+
+
+@app.get("/api/gold/{conv_id}")
+def gold_get(conv_id: str):
+    return _load_gold().get(conv_id) or {"answers": {}}
+
+
+@app.put("/api/gold/{conv_id}")
+def gold_put(conv_id: str, req: GoldReq):
+    gold = _load_gold()
+    gold[conv_id] = {"answers": req.answers, "updated_at": db.now()}
+    GOLD_PATH.parent.mkdir(parents=True, exist_ok=True)
+    GOLD_PATH.write_text(json.dumps(gold, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
+    return gold[conv_id]
+
+
+def gold_compare(gold: dict, latest: dict) -> dict:
+    """Сравнивает исходные ответы ИИ (до апелляций) с эталоном."""
+    per: dict[str, dict] = {}
+    total_err, total_n, match_all, n_all, convs = 0.0, 0, 0, 0, 0
+    for cid, g in gold.items():
+        ev = latest.get(cid)
+        if not ev or not g.get("answers"):
+            continue
+        convs += 1
+        cl = ev["checklist_snapshot"]
+        for c in cl["criteria"]:
+            if c["id"] not in g["answers"]:
+                continue
+            pred, true = ev["original_answers"].get(c["id"]), g["answers"][c["id"]]
+            r = per.setdefault(c["id"], {"id": c["id"], "name": c["name"], "n": 0, "match": 0, "mismatches": []})
+            r["n"] += 1
+            n_all += 1
+            if pred == true:
+                r["match"] += 1
+                match_all += 1
+            else:
+                r["mismatches"].append({"conversation_id": cid, "pred": pred, "gold": true})
+        if all(c["id"] in g["answers"] for c in cl["criteria"]):
+            gt = scoring.compute(cl, g["answers"])["total"]
+            pt = ev["original_score"]["total"]
+            if gt is not None and pt is not None:
+                total_err += abs(gt - pt)
+                total_n += 1
+    rows = list(per.values())
+    for r in rows:
+        r["accuracy"] = r["match"] / r["n"] if r["n"] else None
+    return {
+        "n": convs,
+        "answer_accuracy": match_all / n_all if n_all else None,
+        "total_mae": round(total_err / total_n, 2) if total_n else None,
+        "per_criterion": rows,
+    }
+
+
+# ---------------- фронтенд ----------------
+app.mount("/static", StaticFiles(directory=config.FRONTEND_DIR), name="static")
+
+
+@app.get("/")
+def index():
+    return FileResponse(config.FRONTEND_DIR / "index.html")

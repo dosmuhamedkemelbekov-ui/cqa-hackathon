@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CQA — оценка качества диалогов</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <!-- Весь интерфейс живёт внутри #cqa-app: его можно встроить как HTML web resource в Dynamics 365,
+       задав window.CQA_API_BASE на адрес сервиса оценки. -->
+  <div id="cqa-app">
+    <header class="topbar">
+      <div class="brand"><span class="logo">CQA</span><span class="brand-sub">Conversation Quality Analytics</span></div>
+      <nav class="tabs">
+        <a href="#/" data-tab="list">Диалоги</a>
+        <a href="#/checklists" data-tab="checklists">Чек-лист</a>
+        <a href="#/appeals" data-tab="appeals">Апелляции <span id="appeals-badge" class="badge hidden"></span></a>
+        <a href="#/stats" data-tab="stats">Сводка</a>
+      </nav>
+      <div id="llm-status" class="llm-status"></div>
+    </header>
+    <main id="view"></main>
+    <div id="modal-root"></div>
+    <div id="toast" class="toast hidden"></div>
+  </div>
+  <script>window.CQA_API_BASE = window.CQA_API_BASE || "";</script>
+  <script src="/static/app.js"></script>
+</body>
+</html>
