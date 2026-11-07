@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import config, dataset, db, evaluator, intake, llm, preprocess, scoring
+from . import config, dataset, db, evaluator, intake, llm, preprocess, results_export, scoring
 
 app = FastAPI(title="CQA — Conversation Quality Analytics")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -544,6 +544,38 @@ def export(dataset: str | None = None):
                          for i in ev["criteria"]],
         })
     return rows
+
+
+TEAM_NAME = __import__("os").getenv("CQA_TEAM_NAME", "CQA Team")
+
+
+def _results_doc(ds: str | None, use: str) -> tuple[dict, list[str]]:
+    convs = db.list_conversations(ds)
+    full = [db.get_conversation(c["conversation_id"]) for c in convs]
+    return results_export.build(full, db.latest_evaluations_map(), TEAM_NAME, use), [c["conversation_id"] for c in convs]
+
+
+@app.get("/api/results")
+def results(dataset: str | None = None, use: str = "ai"):
+    """results.json в формате организаторов (JSON 1.0). use=ai — ответы ИИ, use=final — после апелляций."""
+    doc, _ = _results_doc(dataset, use)
+    return doc
+
+
+@app.post("/api/results/save")
+def results_save(dataset: str, use: str = "ai"):
+    """Записывает results/dev|prod/results.json и проверяет формат."""
+    doc, ids = _results_doc(dataset, use)
+    if not ids:
+        raise HTTPException(404, f"В наборе {dataset} нет диалогов")
+    folder = "dev" if dataset.upper() == "DEV" else "prod"
+    path = config.ROOT / "results" / folder / "results.json"
+    results_export.write(doc, path)
+    warnings: list[str] = []
+    problems = results_export.validate(doc, ids, 10 if folder == "prod" else None, warnings)
+    ok = sum(1 for r in doc["results"] if r["status"] == "ok")
+    return {"path": str(path.relative_to(config.ROOT)), "total": len(ids), "ok": ok, "errors_count": len(ids) - ok,
+            "problems": problems, "warnings": warnings}
 
 
 # ---------------- эталонная разметка (для измерения точности) ----------------

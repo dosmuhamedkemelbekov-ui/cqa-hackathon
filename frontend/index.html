@@ -146,8 +146,17 @@ button{cursor:pointer}
 .flow .up{color:var(--ok)}.flow .down{color:var(--err)}
 .sc-badges{display:flex;gap:6px;flex-wrap:wrap}
 .gross-banner{margin:12px 16px 0;background:var(--err);color:#fff;border-radius:3px;padding:10px 12px}
+.res-row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;padding:12px 18px 0}
+.res-row .fld{min-width:200px}
+a.btn{text-decoration:none;display:inline-flex;align-items:center}
+.res-meta{font-size:13px;color:var(--n80);padding-bottom:8px}
+.res-out{padding:12px 18px 16px;font-size:13px}
+.res-out .okline{color:var(--ok,#107c41);font-weight:600}
+.res-out li{margin:2px 0}
 .gross-banner b{display:block;font-size:14px;margin-bottom:3px}
 .gross-banner .ev{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.5);color:#fff}
+.gross-banner .ev .snip{color:#fff;opacity:.92}
+.gross-banner .ev:hover{background:rgba(255,255,255,.28)}
 .role-hint{margin:12px 16px 0;padding:8px 10px;background:var(--info-bg);color:var(--info);border-radius:3px;font-size:12px}
 .acc-tools{display:flex;justify-content:space-between;align-items:center;padding:12px 16px 6px}
 .linkbtn{background:none;border:0;color:var(--info);padding:0;font-size:12px}
@@ -332,7 +341,7 @@ details.reason p{white-space:pre-wrap;font-size:12px;color:var(--n80);margin:6px
 .msg.has-ev .bubble{border-left:3px solid var(--g500)}
 /* карточка */
 .rprev{display:block;font-weight:400;font-size:12px;color:var(--n80);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-.cname{overflow:hidden}
+.cname{overflow:visible;overflow-wrap:anywhere;hyphens:auto}
 .acc.open .rprev{display:none}
 @keyframes flashc{0%{box-shadow:0 0 0 3px rgba(26,154,99,.6)}100%{box-shadow:0 0 0 0 rgba(26,154,99,0)}}
 .acc.flashc{animation:flashc 1.6s ease-out}
@@ -779,7 +788,8 @@ function renderListActions(){
   const missing=list.filter(d=>!d.evaluation||d.evaluation.stale).length;
   let html='<button class="btn sm primary" id="btnEvalMissing"'+(missing&&!state.job?'':' disabled')+' title="Оценить диалоги без оценки или оценённые старой версией чек-листа">Оценить ИИ: '+missing+'</button>'+
     '<button class="btn sm" id="btnEvalAll"'+(list.length&&!state.job?'':' disabled')+' title="Заново прогнать ИИ по всем показанным диалогам">Переоценить все ('+list.length+')</button>'+
-    '<a class="btn sm" style="line-height:24px;text-decoration:none" href="'+API+'/export'+(state.filters.dataset!=='all'?'?dataset='+encodeURIComponent(state.filters.dataset):'')+'" target="_blank">Экспорт</a>';
+    '<a class="btn sm" style="line-height:24px;text-decoration:none" href="'+API+'/results'+(state.filters.dataset!=='all'?'?dataset='+encodeURIComponent(state.filters.dataset):'')+'" target="_blank" title="Файл results.json в формате организаторов (JSON 1.0): по одной записи на диалог набора">results.json</a>'+
+    (state.filters.dataset!=='all'?'<button class="btn sm" id="btnSaveResults" title="Записать results/'+(state.filters.dataset.toUpperCase()==='DEV'?'dev':'prod')+'/results.json в репозиторий и проверить формат">Сохранить в results/'+(state.filters.dataset.toUpperCase()==='DEV'?'dev':'prod')+'</button>':'');
   if(state.job){
     const j=state.job;
     html+='<div class="prog"><span class="spin"></span><span>'+j.done+' / '+j.total+' · вызовов ИИ '+j.llm_calls+' · $'+j.cost_usd.toFixed(3)+'</span><div class="bar"><div style="width:'+(j.total?j.done/j.total*100:0)+'%"></div></div></div>';
@@ -1138,6 +1148,7 @@ function renderSettings(){
         (c.type==='scale'?'<label class="full">Описание ступеней шкалы (по строке: «значение — описание»)<textarea class="in-steps" rows="5">'+esc((c.scale||[]).map(s=>s.value+' — '+(s.label||'')).join('\n'))+'</textarea></label>':'')+
         '<label>Секция<select class="in-sec">'+secs.map(s=>'<option value="'+esc(s.id)+'"'+(s.id===c.section?' selected':'')+'>'+esc(s.name)+'</option>').join('')+'</select></label>'+
         '<label>ID критерия<textarea class="in-id" style="min-height:30px" rows="1"'+(c._isNew?'':' disabled')+'>'+esc(c.id)+'</textarea></label>'+
+        '<label>Код в выгрузке results.json<input type="text" class="in-code" value="'+esc(c.code||'')+'" placeholder="напр. closure — код заменяемого критерия"></label>'+
       '</div></td></tr>';
     }
     return row;
@@ -1288,7 +1299,22 @@ async function renderStats(){
       '</tbody></table></div>';
   }else html+='<div class="empty">Эталонной разметки пока нет.</div>';
   html+='</div>';
+  html+=resultsCard();
   pane.innerHTML=html;
+}
+function resultsCard(){
+  const ds=state.datasets||[];
+  const cur=state.resDs&&ds.indexOf(state.resDs)>=0?state.resDs:(ds.indexOf('DEV')>=0?'DEV':ds[0]);
+  state.resDs=cur;
+  const n=state.list.filter(d=>d.dataset===cur).length,ev=state.list.filter(d=>d.dataset===cur&&d.evaluation).length;
+  const folder=(cur||'').toUpperCase()==='DEV'?'dev':'prod';
+  return '<div class="card" id="resCard"><header><h2>Сдача результатов · JSON 1.0</h2><p>Файл для организаторов: одна запись на диалог, коды критериев contact…critical, номера реплик с 1. Неоценённый диалог попадает в файл со status = "error".</p></header>'+
+    '<div class="res-row"><label class="fld">Набор<select id="resDs">'+ds.map(x=>'<option'+(x===cur?' selected':'')+'>'+esc(x)+'</option>').join('')+'</select></label>'+
+    '<label class="fld">Ответы<select id="resUse"><option value="ai">исходные ответы ИИ</option><option value="final"'+(state.resUse==='final'?' selected':'')+'>после решений супервизора</option></select></label>'+
+    '<div class="res-meta">Оценено <b>'+ev+' / '+n+'</b>'+(folder==='prod'&&n!==10?' · <span style="color:var(--err)">в prod ожидается 10 диалогов</span>':'')+'</div></div>'+
+    '<div class="res-row"><a class="btn" id="resDl" href="'+API+'/results?dataset='+encodeURIComponent(cur||'')+'&use='+(state.resUse||'ai')+'" target="_blank" rel="noopener">Открыть results.json</a>'+
+    '<button class="btn primary" id="resSave">Сохранить в results/'+folder+'/results.json и проверить</button></div>'+
+    '<div id="resOut" class="res-out" aria-live="polite"></div></div>';
 }
 
 /* =====================================================================
@@ -1639,6 +1665,16 @@ function bind(){
       if(!confirm('Заново прогнать ИИ по '+list.length+' диалогам? Неизменённые критерии будут взяты из прошлых оценок.'))return;
       startJob(list.map(d=>d.conversation_id)).catch(err=>toast(err.message,'err'));
     }
+    const sv=e.target.closest('#btnSaveResults');
+    if(sv){
+      const ds=state.filters.dataset;busy(sv,true,'Сохраняю…');
+      api('/results/save?dataset='+encodeURIComponent(ds),{method:'POST'}).then(r=>{
+        busy(sv,false);
+        const msg=r.path+': записей '+r.total+', ok '+r.ok+(r.errors_count?', error '+r.errors_count:'');
+        if(r.problems.length)toast('Формат: '+r.problems.slice(0,3).join('; '),'err',9000);
+        else toast('✓ '+msg+'. Осталось сделать git commit и push','ok',7000);
+      }).catch(err=>{busy(sv,false);toast(err.message,'err');});
+    }
   });
   const pick=e=>{const li=e.target.closest('.li');if(li)selectDialog(li.dataset.id,true);};
   $('#dlgList').addEventListener('click',pick);
@@ -1745,8 +1781,27 @@ function bind(){
 
   /* сводка */
   $('#statsPane').addEventListener('click',e=>{
+    const sv=e.target.closest('#resSave');
+    if(sv){
+      busy(sv,true,'Проверяю…');
+      api('/results/save?dataset='+encodeURIComponent(state.resDs)+'&use='+(state.resUse||'ai'),{method:'POST'}).then(r=>{
+        busy(sv,false);
+        $('#resOut').innerHTML=(r.problems.length
+          ?'<div style="color:var(--err);font-weight:600">✘ Формат нарушен ('+r.problems.length+'):</div><ul>'+r.problems.slice(0,12).map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>'
+          :'<div class="okline">✔ '+esc(r.path)+' записан: '+r.total+' записей, ok '+r.ok+(r.errors_count?', error '+r.errors_count:'')+'. Формат JSON 1.0 соблюдён.</div>')+
+          (r.warnings.length?'<ul>'+r.warnings.slice(0,5).map(x=>'<li>⚠ '+esc(x)+'</li>').join('')+'</ul>':'')+
+          '<div style="margin-top:6px;color:var(--n80)">Осталось отправить в Git: <code>git add '+esc(r.path)+' &amp;&amp; git commit -m "results" &amp;&amp; git push</code></div>';
+      }).catch(err=>{busy(sv,false);toast(err.message,'err');});
+      return;
+    }
     const a=e.target.closest('.go-dlg');if(!a)return;e.preventDefault();
     setView('dialogs');state.labelMode=true;selectDialog(a.dataset.id);
+  });
+  $('#statsPane').addEventListener('change',e=>{
+    if(e.target.id==='resDs'||e.target.id==='resUse'){
+      if(e.target.id==='resDs')state.resDs=e.target.value;else state.resUse=e.target.value;
+      const c=$('#resCard');if(c)c.outerHTML=resultsCard();
+    }
   });
 
   /* настройки */
@@ -1759,6 +1814,7 @@ function bind(){
     else if(t.contains('in-rule'))c.rule=e.target.value;
     else if(t.contains('in-nacond'))c.na_condition=e.target.value;
     else if(t.contains('in-guide'))c.guidance=e.target.value;
+    else if(t.contains('in-code')){const v=e.target.value.trim();if(v)c.code=v;else delete c.code;}
     else if(t.contains('in-id')){const v=e.target.value.trim();$$('tr[data-id="'+CSS.escape(c.id)+'"]',sb).forEach(tr=>tr.dataset.id=v);c.id=v;}
     else if(t.contains('in-scale')){
       const p=parseScale(e.target.value);c._scaleRaw=e.target.value;c._scaleBad=!p;
