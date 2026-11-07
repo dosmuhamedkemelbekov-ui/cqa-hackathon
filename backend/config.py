@@ -35,7 +35,9 @@ DATASET_API_URL = os.getenv(
 LLM_API_KEY = os.getenv("OPENAI_API_KEY", "")
 LLM_BASE_URL = os.getenv("OPENAI_BASE_URL") or None  # напр. http://localhost:11434/v1 для Ollama
 LLM_MODEL = os.getenv("CQA_MODEL", "gpt-4.1")
-LLM_CONCURRENCY = int(os.getenv("CQA_CONCURRENCY", "8"))
+LLM_CONCURRENCY = int(os.getenv("CQA_CONCURRENCY", "16"))
+# Сколько диалогов оценивается одновременно в пакете (каждый сохраняется сразу после оценки).
+DIALOG_CONCURRENCY = int(os.getenv("CQA_DIALOG_CONCURRENCY", "4"))
 # Сколько независимых прогонов на критерий (голосование большинством / медиана). 1 — быстрее и дешевле.
 LLM_SAMPLES = int(os.getenv("CQA_SAMPLES", "1"))
 # Самопроверка: рискованные ответы (Нет, N/A, неполный балл, грубая ошибка, низкая уверенность)

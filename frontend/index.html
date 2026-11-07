@@ -917,7 +917,7 @@ function reliabilityBlock(ev){
     '<div class="rel-i"><b>'+r.quotes_verified+'/'+r.quotes_total+'</b><span>цитат сверено с текстом</span></div>'+
     '<div class="rel-i"><b>'+r.self_checked+'</b><span>рискованных ответов перепроверено</span></div>'+
     '<div class="rel-i"><b>'+r.self_corrected+'</b><span>исправлено самопроверкой</span></div>'+
-    '<div class="rel-i"><b>'+r.low_confidence+'</b><span>с низкой уверенностью</span></div></div>';
+    (r.samples>1?'<div class="rel-i"><b>'+r.split_votes+'</b><span>критериев, где '+r.samples+' прогона разошлись</span></div>':'<div class="rel-i"><b>'+r.low_confidence+'</b><span>с низкой уверенностью</span></div>')+'</div>';
 }
 function coachingBlock(ev){
   const co=ev.coaching;

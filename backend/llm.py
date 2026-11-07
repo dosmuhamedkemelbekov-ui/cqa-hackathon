@@ -110,7 +110,13 @@ async def complete_json(system: str, user: str, schema: dict, name: str, model: 
             if not hit:
                 raise
             _unsupported.update(hit)
-        except (RateLimitError, APIConnectionError) as e:
+        except RateLimitError as e:
+            # Закончились кредиты — повторять бессмысленно, сразу понятная ошибка.
+            if any(s in str(e).lower() for s in ("insufficient_quota", "no credits", "exceeded your current quota")):
+                raise RuntimeError("На ключе OpenAI закончились кредиты — пополните баланс в platform.openai.com") from e
+            last_err = e
+            await asyncio.sleep(2 * (attempt + 1))
+        except APIConnectionError as e:
             last_err = e
             await asyncio.sleep(2 * (attempt + 1))
         except APIStatusError as e:

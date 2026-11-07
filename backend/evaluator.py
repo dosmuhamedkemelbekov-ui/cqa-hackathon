@@ -346,6 +346,9 @@ async def evaluate(conv: dict, checklist: dict, samples: int | None = None, prev
         kw = {"precedents": precedents, "conv_id": conv["conversation_id"]}
         results.append(await evaluate_criterion(todo[0], prepared, samples, key, schema, **kw))
         results += await asyncio.gather(*[evaluate_criterion(c, prepared, samples, key, schema, **kw) for c in todo[1:]])
+    # Если ИИ не ответил ни по одному критерию (нет кредитов, сеть) — не сохраняем пустую оценку поверх хорошей.
+    if todo and all(r.get("answer") is None for r in results):
+        raise RuntimeError(f"ИИ не смог оценить ни один критерий: {results[0].get('error', '')[:300]}")
     crit_results = {r["criterion_id"]: r for r in results} | reused
     usage = {"input": 0, "cached": 0, "output": 0}
     for r in results:
@@ -409,6 +412,8 @@ def reliability(ev: dict) -> dict:
         "self_checked": sum(1 for v in ver if v["verdict"] in ("confirmed", "changed")),
         "self_corrected": sum(1 for v in ver if v["verdict"] == "changed"),
         "low_confidence": sum(1 for i in ev["criteria"] if i.get("confidence") == "low"),
+        "samples": ev.get("samples", 1),
+        "split_votes": sum(1 for i in ev["criteria"] if i.get("votes") and len(i["votes"]) > 1),
     }
 
 

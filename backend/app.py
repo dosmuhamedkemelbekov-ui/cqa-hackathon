@@ -255,8 +255,15 @@ async def _run_job(job_id: str, conv_ids: list[str], cl: dict, samples: int | No
         finally:
             job["done"] += 1
 
-    # Диалоги параллельно; общий лимит запросов к LLM держит семафор в llm.py.
-    await asyncio.gather(*[one(c) for c in conv_ids])
+    # Небольшими группами: каждый диалог сохраняется сразу после оценки, прогресс не теряется.
+    # Общий лимит одновременных запросов к LLM держит семафор в llm.py.
+    sem = asyncio.Semaphore(config.DIALOG_CONCURRENCY)
+
+    async def limited(cid: str):
+        async with sem:
+            await one(cid)
+
+    await asyncio.gather(*[limited(c) for c in conv_ids])
     job["status"] = "finished"
 
 
