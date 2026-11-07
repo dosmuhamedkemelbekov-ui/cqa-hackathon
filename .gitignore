@@ -6,3 +6,5 @@ data/*.sqlite3-journal
 data/uploads/
 .venv/
 .claude/
+data/*.sqlite3-wal
+data/*.sqlite3-shm
