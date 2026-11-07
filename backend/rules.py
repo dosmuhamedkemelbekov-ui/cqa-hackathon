@@ -30,6 +30,26 @@ END_CLIENT = re.compile(r"(клиент покинул|покинул чат|с�
                         r"connection .*lost|customer left|left the chat)", re.I)
 END_OPERATOR = re.compile(r"(оператор закрыл чат|оператор чатты жапты|agent closed the chat|operator closed the chat)", re.I)
 
+# Вежливые формулы и прощания: если последняя реплика оператора состоит только из них — итога нет.
+POLITE = re.compile(r"(пожалуйста|рад[аы]?\s+помочь|отлично|хорошо|спасибо за обращение|спасибо за ожидание|спасибо|"
+                    r"оқасы жоқ|көмегім тигеніне қуаныштымын|жақсы|рақмет|"
+                    r"you'?re welcome|glad (you got in|to help|i could help)|happy to help|great|of course|"
+                    r"thanks for (reaching out|contacting us|your patience)|thank you|and)", re.I)
+BYE = re.compile(r"(до свидания|хорошего (дня|вечера)|всего (доброго|хорошего)|сау болыңыз|күніңіз сәтті өтсін|"
+                 r"goodbye|good bye|bye|have a (good|nice|great) (day|evening)|take care)", re.I)
+# Уточняющий вопрос оператора: знак вопроса или просьба уточнить.
+CLARIFY = re.compile(r"(\?|уточните|укажите|подскажите|напишите,? (какой|какая|какие|как|где|когда)|"
+                     r"нақтылаңыз|айтыңыз|жазыңыз|specify|could you tell|let me know which)", re.I)
+
+
+def only_polite_bye(text: str) -> bool:
+    """Реплика — только вежливая формула + прощание, без итога и предложения помощи."""
+    if not BYE.search(text):
+        return False
+    rest = POLITE.sub(" ", BYE.sub(" ", text))
+    return not re.sub(r"[\s.,!?—-]+", " ", rest).strip()
+
+
 _DEFAULT: dict | None = None
 
 
@@ -76,10 +96,12 @@ def apply(conv: dict, checklist: dict, prepared: dict, results: dict[str, dict])
         if not r or r.get("answer") is None:
             return
         before = r["answer"]
-        r["rule"] = {"from": before, "to": answer, "why": why, "changed": before != answer}
+        prev = r.get("rule") or {}
+        r["rule"] = {"from": before, "to": answer, "why": why, "changed": before != answer,
+                     "llm_rationale": prev.get("llm_rationale", r.get("rationale") or "")}
         if before != answer:
             r["answer"] = answer
-            r["rationale"] = f"{why} (Решение по правилу; ИИ ответил: {before}.) " + (r.get("rationale") or "")
+            r["rationale"] = f"{why} (Решение по правилу; ИИ ответил: {before}.) " + r["rule"]["llm_rationale"]
             if msg_id and not any(e.get("msg_id") == msg_id for e in r.get("evidence") or []):
                 m = next((x for x in msgs if x["id"] == msg_id), None)
                 if m:
@@ -108,12 +130,26 @@ def apply(conv: dict, checklist: dict, prepared: dict, results: dict[str, dict])
                 continue
             if is_voice:
                 continue
+            ops = [m for m in msgs if m["speaker"] == "operator"]
+            if ops and only_polite_bye(ops[-1]["text"]):
+                set_answer(c, "no", f"Последняя реплика оператора ({ops[-1]['id']}) — только вежливая формула и прощание: "
+                                    "нет ни итога, ни предложения дальнейшей помощи.", ops[-1]["id"])
+                continue
             end = next((m for m in reversed(msgs) if m["speaker"] == "system" and END_CLIENT.search(m["text"])), None)
             if end:
                 before = [m for m in msgs if m["idx"] < end["idx"] and m["speaker"] in ("client", "operator")]
                 if before and before[-1]["speaker"] == "client":
                     set_answer(c, "na", "Чат оборвался сразу после реплики клиента — у оператора не было "
                                         "возможности завершить диалог.", end["id"])
+            elif ops and not any(BYE.search(m["text"]) for m in ops):
+                set_answer(c, "no", "Оператор так и не попрощался, а чат не оборвался (нет события завершения).",
+                           ops[-1]["id"])
+        elif code == "discovery":
+            ops = [m for m in msgs if m["speaker"] == "operator"]
+            r = results.get(c["id"]) or {}
+            if r.get("answer") == "yes" and ops and not any(CLARIFY.search(m["text"]) for m in ops):
+                set_answer(c, "na", "Оператор не задал ни одного уточняющего вопроса и ответил сразу — «Да» "
+                                    "требует уточнения недостающего; данных хватало с начала.", None)
     # Согласованность: если клиент так и не сформулировал запрос (консультация N/A), выявлять было нечего.
     by_code = {_code(c): c for c in checklist["criteria"]}
     cons, disc = by_code.get("consultation"), by_code.get("discovery")

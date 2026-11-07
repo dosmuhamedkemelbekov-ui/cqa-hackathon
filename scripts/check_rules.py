@@ -30,6 +30,8 @@ def main() -> int:
         res["c01"]["answer"] = flip[g["c01"]]
         res["c03"]["answer"] = "na"
         res["c07"]["answer"] = "yes" if g["c07"] != "yes" else "no"
+        if g["c02"] == "na":
+            res["c02"]["answer"] = "yes"  # типичная ошибка модели: «учёл детали» → «Да» без уточнений
         rules.apply(r, cl, prep, res)
         for cid in ("c01", "c03", "c07", "c02"):
             ru = res[cid].get("rule")
