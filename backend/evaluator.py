@@ -4,7 +4,7 @@ import re
 import time
 from collections import Counter
 
-from . import config, llm, preprocess, scoring
+from . import config, llm, preprocess, rules, scoring
 
 SYSTEM_PROMPT = """Ты — старший аналитик контроля качества контакт-центра брокерской компании Freedom Broker.
 Ты оцениваешь работу ОПЕРАТОРА (живого сотрудника) в диалоге с клиентом по одному критерию чек-листа.
@@ -285,6 +285,7 @@ def build_result(conv: dict, checklist: dict, crit_results: dict[str, dict], met
                 "confidence": r.get("confidence"),
                 "votes": r.get("votes"),
                 "verification": r.get("verification"),
+                "rule": r.get("rule"),
                 "error": r.get("error"),
             }
         )
@@ -374,6 +375,8 @@ async def evaluate(conv: dict, checklist: dict, samples: int | None = None, prev
     samples = samples or int(getattr(config, "LLM_SAMPLES", 1) or 1)
     t0 = time.time()
     prepared = preprocess.prepare(conv)
+    if config.RULES_ENABLED:
+        prepared["facts"]["rule_hints"] = rules.facts_lines(conv, prepared)
     reused: dict[str, dict] = {}
     unchanged: set[str] = set()  # критерии, по которым вердикт супервизора остаётся в силе
     if previous:
@@ -386,7 +389,7 @@ async def evaluate(conv: dict, checklist: dict, samples: int | None = None, prev
             if reuse_answers and p and item and item.get("answer") is not None and _same_prompt(c, p):
                 reused[c["id"]] = {
                     **{k: item.get(k) for k in ("answer", "evidence", "checked_range", "rationale", "analysis",
-                                                "confidence", "votes", "verification")},
+                                                "confidence", "votes", "verification", "rule")},
                     "criterion_id": c["id"],
                     "reused": True,
                     "usage": {"input": 0, "cached": 0, "output": 0},
@@ -410,6 +413,7 @@ async def evaluate(conv: dict, checklist: dict, samples: int | None = None, prev
     if todo and all(r.get("answer") is None for r in results):
         raise RuntimeError(f"ИИ не смог оценить ни один критерий: {results[0].get('error', '')[:300]}")
     crit_results = {r["criterion_id"]: r for r in results} | reused
+    rules_fired = rules.apply(conv, checklist, prepared, crit_results)
     usage = {"input": 0, "cached": 0, "output": 0}
     for r in results:
         for k in usage:
@@ -422,6 +426,7 @@ async def evaluate(conv: dict, checklist: dict, samples: int | None = None, prev
                       else (1 if results else 0) + sum(1 for r in results if not r.get("single_call") and r.get("usage", {}).get("input"))) + sum(
             1 for r in results if (r.get("verification") or {}).get("verdict") in ("confirmed", "changed")),
         "reused_criteria": sorted(reused),
+        "rules_fired": rules_fired,
         "usage": usage,
         "cost_usd": round(llm.cost_usd(usage), 5),
         "duration_s": round(time.time() - t0, 1),

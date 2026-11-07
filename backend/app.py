@@ -272,7 +272,7 @@ def checklist(cl_id: str, version: int | None = None):
 @app.post("/api/checklists")
 def save_checklist(cl: dict[str, Any], activate: bool = True):
     cl = _validate_checklist({k: v for k, v in cl.items() if k not in ("version", "saved_at", "active", "versions")})
-    saved = db.save_checklist(cl)
+    saved = db.save_checklist({**cl, "source": "user"})
     if activate:
         db.set_setting("active_checklist", saved["id"])
     return saved

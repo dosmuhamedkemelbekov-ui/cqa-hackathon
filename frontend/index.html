@@ -1313,6 +1313,8 @@ function critItem(ev,c,i){
     body+='<div class="kv"><div class="k">Доказательства в диалоге</div><div>'+evChips(item.evidence)+
       (item.checked_range?'<button class="ev range" data-mid="'+esc(item.checked_range.from_msg)+'" data-range="'+esc(item.checked_range.from_msg+','+item.checked_range.to_msg)+'" title="Участок, где ИИ искал действие"><span class="tm">⇕ '+esc((msgById(item.checked_range.from_msg)||{}).clock||'')+'–'+esc((msgById(item.checked_range.to_msg)||{}).clock||'')+'</span><span class="snip">проверенный участок разговора</span></button>':'')+'</div></div>';
   }
+  if(item.rule&&item.rule.changed)body+='<div class="box selfcheck changed"><div class="h">⚙ Правило поправило ответ ИИ: '+esc(plainVal(c,uiVal(c,item.rule.from)))+' → '+esc(plainVal(c,uiVal(c,item.rule.to)))+'</div>'+esc(item.rule.why)+' Правило проверяет объективный факт в диалоге и проверено на всех 65 диалогах DEV.</div>';
+  else if(item.rule)body+='<div class="box selfcheck"><div class="h">⚙ Правило подтвердило ответ ИИ</div>'+esc(item.rule.why)+'</div>';
   const vr=item.verification;
   if(vr&&vr.verdict==='changed')body+='<div class="box selfcheck changed"><div class="h">↻ Самопроверка ИИ исправила ответ: '+esc(plainVal(c,uiVal(c,vr.from)))+' → '+esc(plainVal(c,uiVal(c,vr.to)))+'</div>'+esc(vr.reason)+'</div>';
   else if(vr&&vr.verdict==='confirmed')body+='<div class="box selfcheck"><div class="h">✓ Самопроверка подтвердила ответ</div>Ответ рискованный (снижает балл или N/A), поэтому его независимо перепроверил второй проход ИИ.</div>';
@@ -1352,7 +1354,7 @@ function critItem(ev,c,i){
       '<span class="acc-right"><span class="wtag">'+effTag+'</span>'+
       valBadge(c,v)+(revChanged?'<span class="b gray" title="Оценка изменена супервизором">пересм.</span>':'')+appBadge+
       (item.confidence==='low'?'<span class="b warn" title="Низкая уверенность модели">?</span>':'')+
-      (item.verification&&item.verification.verdict==='changed'?'<span class="b info" title="Самопроверка ИИ исправила ответ">↻</span>':item.verification&&item.verification.verdict==='confirmed'?'<span class="b ok sc-ok" title="Ответ подтверждён самопроверкой ИИ">✓✓</span>':'')+
+      (item.rule&&item.rule.changed?'<span class="b info" title="Ответ поправило детерминированное правило">⚙</span>':'')+(item.verification&&item.verification.verdict==='changed'?'<span class="b info" title="Самопроверка ИИ исправила ответ">↻</span>':item.verification&&item.verification.verdict==='confirmed'?'<span class="b ok sc-ok" title="Ответ подтверждён самопроверкой ИИ">✓✓</span>':'')+
       (canAppeal?'<button class="btn sm danger btn-appeal" data-cid="'+c.id+'">Оспорить</button>':'')+
       '</span></div>'+
     '<div class="acc-body">'+body+'</div></div>';
