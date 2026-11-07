@@ -30,6 +30,8 @@ def health():
         "stt_configured": intake.stt_configured(),
         "stt_model": config.STT_MODEL,
         "verify": config.LLM_VERIFY,
+        "eval_mode": config.EVAL_MODE,
+        "rpm": config.LLM_RPM,
         "precedents": len(db.get_setting("precedents", [])),
     }
 

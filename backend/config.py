@@ -50,6 +50,12 @@ PRECEDENTS_PER_CRITERION = int(os.getenv("CQA_PRECEDENTS", "6"))
 STT_MODEL = os.getenv("CQA_STT_MODEL", "whisper-1")
 STT_API_KEY = os.getenv("CQA_STT_API_KEY") or LLM_API_KEY
 STT_BASE_URL = os.getenv("CQA_STT_BASE_URL") or LLM_BASE_URL
+# ---- Режим оценки ----
+# per_criterion — отдельный вызов на каждый критерий (точнее, 8+ вызовов на диалог);
+# single — все критерии в одном вызове (1 вызов на диалог) — для бесплатных тарифов с дневным лимитом.
+EVAL_MODE = os.getenv("CQA_EVAL_MODE", "per_criterion").strip().lower()
+# Ограничение запросов в минуту к LLM (0 — без ограничения). Для бесплатных тарифов: 10–15.
+LLM_RPM = float(os.getenv("CQA_RPM", "0"))
 # ---- Провайдер LLM: "openai" (любой OpenAI-совместимый API) или "anthropic" (Claude) ----
 LLM_PROVIDER = os.getenv("CQA_PROVIDER", "openai").strip().lower()
 ANTHROPIC_API_KEY = os.getenv("CQA_ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_API_KEY", "")

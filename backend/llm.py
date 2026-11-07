@@ -22,6 +22,34 @@ def client() -> AsyncOpenAI:
     return _client
 
 
+_rate_lock: asyncio.Lock | None = None
+_next_slot = 0.0
+
+
+async def rate_limit() -> None:
+    """Равномерно распределяет запросы: не больше CQA_RPM в минуту (бесплатные тарифы)."""
+    global _rate_lock, _next_slot
+    if config.LLM_RPM <= 0:
+        return
+    if _rate_lock is None:
+        _rate_lock = asyncio.Lock()
+    loop = asyncio.get_running_loop()
+    async with _rate_lock:
+        now = loop.time()
+        wait = _next_slot - now
+        _next_slot = max(now, _next_slot) + 60.0 / config.LLM_RPM
+    if wait > 0:
+        await asyncio.sleep(wait)
+
+
+def _retry_after(e) -> float | None:
+    try:
+        v = e.response.headers.get("retry-after")
+        return float(v) if v else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def semaphore() -> asyncio.Semaphore:
     global _sem
     if _sem is None:
@@ -81,7 +109,8 @@ async def _complete_openai(system: str, user: str, schema: dict, name: str, mode
     """Возвращает (распарсенный JSON, usage). Строгая JSON Schema; при отказе модели — json_object."""
     model = model or config.LLM_MODEL
     last_err: Exception | None = None
-    for attempt in range(4):
+    attempts = 7 if config.LLM_RPM > 0 else 4  # бесплатные тарифы: терпеливее к 429
+    for attempt in range(attempts):
         kwargs: dict = {
             "model": model,
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
@@ -113,6 +142,7 @@ async def _complete_openai(system: str, user: str, schema: dict, name: str, mode
             )
         try:
             async with semaphore():
+                await rate_limit()
                 resp = await client().chat.completions.create(**kwargs)
             text = resp.choices[0].message.content or ""
             return json.loads(text), _usage(resp)
@@ -136,10 +166,14 @@ async def _complete_openai(system: str, user: str, schema: dict, name: str, mode
             _unsupported.update(hit)
         except RateLimitError as e:
             # Закончились кредиты — повторять бессмысленно, сразу понятная ошибка.
-            if any(s in str(e).lower() for s in ("insufficient_quota", "no credits", "exceeded your current quota")):
-                raise RuntimeError("На ключе OpenAI закончились кредиты — пополните баланс в platform.openai.com") from e
+            msg = str(e).lower()
+            if any(s in msg for s in ("insufficient_quota", "no credits", "exceeded your current quota")) and "per day" not in msg \
+                    and "perday" not in msg and config.LLM_RPM <= 0:
+                raise RuntimeError("На ключе закончились кредиты/квота — пополните баланс или смените провайдера") from e
+            if "per day" in msg or "perday" in msg or "requests per day" in msg:
+                raise RuntimeError("Исчерпан дневной лимит бесплатного тарифа — продолжите завтра или смените ключ/модель") from e
             last_err = e
-            await asyncio.sleep(2 * (attempt + 1))
+            await asyncio.sleep(min(60.0, _retry_after(e) or 5 * (attempt + 1)))
         except APIConnectionError as e:
             last_err = e
             await asyncio.sleep(2 * (attempt + 1))
