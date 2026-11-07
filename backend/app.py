@@ -25,8 +25,7 @@ def health():
     return {
         "ok": True,
         "llm_configured": llm.is_configured(),
-        "model": config.LLM_MODEL,
-        "base_url": config.LLM_BASE_URL or "https://api.openai.com/v1",
+        **llm.provider_info(),
         "samples": config.LLM_SAMPLES,
         "verify": config.LLM_VERIFY,
         "precedents": len(db.get_setting("precedents", [])),

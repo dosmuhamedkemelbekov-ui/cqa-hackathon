@@ -45,7 +45,27 @@ LLM_SAMPLES = int(os.getenv("CQA_SAMPLES", "1"))
 LLM_VERIFY = os.getenv("CQA_VERIFY", "1") not in ("0", "false", "no")
 # Сколько последних прецедентов (решений супервизора) по критерию подмешивать в промпт.
 PRECEDENTS_PER_CRITERION = int(os.getenv("CQA_PRECEDENTS", "6"))
-# Цена за 1M токенов (USD) — для расчёта стоимости одной оценки. Задайте под свою модель.
+# ---- Провайдер LLM: "openai" (любой OpenAI-совместимый API) или "anthropic" (Claude) ----
+LLM_PROVIDER = os.getenv("CQA_PROVIDER", "openai").strip().lower()
+ANTHROPIC_API_KEY = os.getenv("CQA_ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_API_KEY", "")
+# Адрес API Anthropic задаётся явно: переменная окружения ANTHROPIC_BASE_URL может принадлежать другим программам.
+ANTHROPIC_BASE_URL = os.getenv("CQA_ANTHROPIC_BASE_URL", "https://api.anthropic.com")
+CLAUDE_MODEL = os.getenv("CQA_CLAUDE_MODEL", "claude-opus-5-5")
+# Глубина рассуждения Claude: low | medium | high | xhigh | max
+CLAUDE_EFFORT = os.getenv("CQA_CLAUDE_EFFORT", "medium")
+if LLM_PROVIDER == "anthropic":
+    LLM_MODEL = CLAUDE_MODEL
+
+# Цены Claude за 1M токенов (USD): вход, чтение кэша, запись кэша, выход.
+CLAUDE_PRICES = {
+    "claude-fable-5-1": (10.0, 0.25, 12.5, 50.0),
+    "claude-opus-5-5": (4.0, 0.20, 5.0, 20.0),
+    "claude-opus-5": (5.0, 0.50, 6.25, 25.0),
+    "claude-sonnet-5-5": (2.0, 0.20, 2.5, 10.0),
+    "claude-haiku-5-5": (0.10, 0.01, 0.125, 0.50),
+}
+
+# Цена за 1M токенов (USD) для OpenAI-совместимого провайдера. Задайте под свою модель.
 PRICE_INPUT_PER_M = float(os.getenv("CQA_PRICE_INPUT_PER_M", "2.0"))
 PRICE_CACHED_INPUT_PER_M = float(os.getenv("CQA_PRICE_CACHED_INPUT_PER_M", "0.5"))
 PRICE_OUTPUT_PER_M = float(os.getenv("CQA_PRICE_OUTPUT_PER_M", "8.0"))
