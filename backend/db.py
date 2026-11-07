@@ -16,12 +16,32 @@ def now() -> str:
 
 def _connect() -> sqlite3.Connection:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False, timeout=30)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout=30000")
     return conn
 
 
-_conn = _connect()
+# Своё подключение на каждый поток: FastAPI выполняет запросы параллельно в пуле потоков,
+# а одно общее подключение SQLite при одновременном чтении путает результаты (сервер падал с 500).
+_local = threading.local()
+
+
+class _ConnProxy:
+    def __getattr__(self, name):
+        c = getattr(_local, "conn", None)
+        if c is None:
+            c = _local.conn = _connect()
+        return getattr(c, name)
+
+
+_conn = _ConnProxy()
+_wal = _connect()
+try:
+    _wal.execute("PRAGMA journal_mode=WAL")  # чтение не блокируется записью
+except sqlite3.DatabaseError:
+    pass
+_wal.close()
 
 
 def init() -> None:

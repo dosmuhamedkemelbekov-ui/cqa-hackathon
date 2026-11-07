@@ -994,7 +994,7 @@ async function loadHealth(){
   try{
     state.health=await api('/health');
     $('#tabsNote').innerHTML=state.health.llm_configured
-      ?'Оценка ИИ на сервере · модель <b>'+esc(state.health.model)+'</b>'+(state.health.samples>1?' · '+state.health.samples+' прогона на критерий':'')+(state.health.verify?' · самопроверка вкл.':'')
+      ?'Оценка ИИ на сервере · модель <b>'+esc(state.health.model)+'</b>'+(state.health.samples>1?' · '+state.health.samples+' прогона на критерий':'')+(state.health.verify?' · самопроверка вкл.':'')+(state.health.eval_mode==='single'?' · экономный режим (1 вызов на диалог)':'')+(state.health.rpm>0?' · ≤'+state.health.rpm+' запр./мин':'')
       :'<span style="color:var(--err)">LLM не настроена: задайте OPENAI_API_KEY в .env</span>';
   }catch(e){$('#tabsNote').innerHTML='<span style="color:var(--err)">Сервер оценки недоступен</span>';}
 }

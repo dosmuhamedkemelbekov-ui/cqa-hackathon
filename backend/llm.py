@@ -27,6 +27,26 @@ def client() -> AsyncOpenAI:
     return _client
 
 
+_rate_lock: asyncio.Lock | None = None
+_next_slot = 0.0
+
+
+async def rate_limit() -> None:
+    """Равномерно распределяет запросы: не больше CQA_RPM в минуту (бесплатные тарифы)."""
+    global _rate_lock, _next_slot
+    if config.LLM_RPM <= 0:
+        return
+    if _rate_lock is None:
+        _rate_lock = asyncio.Lock()
+    loop = asyncio.get_running_loop()
+    async with _rate_lock:
+        now = loop.time()
+        wait = _next_slot - now
+        _next_slot = max(now, _next_slot) + 60.0 / config.LLM_RPM
+    if wait > 0:
+        await asyncio.sleep(wait)
+
+
 def semaphore() -> asyncio.Semaphore:
     global _sem
     if _sem is None:
@@ -145,6 +165,7 @@ async def _complete_openai(system: str, user: str, schema: dict, name: str, mode
             )
         try:
             async with semaphore():
+                await rate_limit()
                 resp = await client().chat.completions.create(**kwargs)
             text = resp.choices[0].message.content or ""
             return json.loads(text), _usage(resp)

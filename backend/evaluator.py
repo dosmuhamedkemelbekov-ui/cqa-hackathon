@@ -312,6 +312,61 @@ def _same_prompt(a: dict, b: dict) -> bool:
     return all(a.get(f) == b.get(f) for f in PROMPT_FIELDS)
 
 
+SINGLE_TASK = """
+Оцени работу оператора по КАЖДОМУ критерию ниже независимо, строго по его правилу, условию N/A и уточнениям.
+Верни в массиве criteria ровно по одному объекту на каждый критерий, criterion_id — как указан в заголовке критерия.
+
+"""
+
+
+def single_schema(answers: list[str]) -> dict:
+    item = response_schema(answers)
+    item = {**item, "required": ["criterion_id"] + item["required"],
+            "properties": {"criterion_id": {"type": "string"}, **item["properties"]}}
+    return {"type": "object", "additionalProperties": False, "required": ["criteria"],
+            "properties": {"criteria": {"type": "array", "items": item}}}
+
+
+async def evaluate_all_in_one(todo: list[dict], prepared: dict, precedents, conv_id: str, cache_key: str):
+    """Один вызов LLM на все критерии диалога. Возвращает (результаты, критерии для дооценки по одному)."""
+    prefix = ("ТРАНСКРИПТ (формат: [id | время | роль] текст):\n" + prepared["transcript_text"]
+              + "\n\nФАКТЫ:\n" + preprocess.facts_text(prepared["facts"]) + "\n\n")
+    parts = [f"=== criterion_id: {c['id']} ===\n" + criterion_prompt(c) + precedents_block(c, precedents, conv_id)
+             for c in todo]
+    vals: list[str] = []
+    for c in todo:
+        for a in scoring.allowed_answers(c):
+            if a not in vals:
+                vals.append(a)
+    try:
+        data, usage = await llm.complete_json(SYSTEM_PROMPT, SINGLE_TASK + "\n\n".join(parts), single_schema(vals),
+                                              name="dialog_evaluation", cache_key=cache_key, user_prefix=prefix)
+    except Exception:  # noqa: BLE001 — не вышло одним вызовом: все критерии по одному
+        return [], todo
+    ids = {m["id"]: m for m in prepared["messages"]}
+    got = {r.get("criterion_id"): r for r in data.get("criteria", []) if isinstance(r, dict)}
+    results, missing = [], []
+    share = len(todo)
+    for i, c in enumerate(todo):
+        r = got.get(c["id"])
+        if not r or r.get("answer") not in scoring.allowed_answers(c):
+            missing.append(c)
+            continue
+        rng = r.get("checked_range") or {}
+        chk = ({"from_msg": rng["from_msg"], "to_msg": rng["to_msg"]}
+               if rng.get("from_msg") in ids and rng.get("to_msg") in ids else None)
+        # usage одного вызова относим к первому критерию, чтобы сумма по диалогу была верной
+        u = usage if i == 0 else {"input": 0, "cached": 0, "output": 0}
+        res = {"criterion_id": c["id"], "answer": r["answer"], "votes": None,
+               "evidence": check_quotes([e for e in r.get("evidence", []) if e.get("msg_id") in ids], ids),
+               "checked_range": chk, "analysis": r.get("analysis", ""), "rationale": r.get("rationale", ""),
+               "confidence": r.get("confidence"), "verification": None, "usage": u}
+        results.append(res)
+    if results and share:
+        results[0]["single_call"] = True
+    return results, missing
+
+
 async def evaluate(conv: dict, checklist: dict, samples: int | None = None, previous: dict | None = None,
                    reuse_answers: bool = True, precedents: list[dict] | None = None) -> dict:
     """previous — прошлая оценка диалога: неизменённые критерии берутся из неё без вызова LLM,
@@ -342,8 +397,13 @@ async def evaluate(conv: dict, checklist: dict, samples: int | None = None, prev
     key = f"cqa-{conv['conversation_id']}"
     schema = checklist_schema(checklist)
     results = []
-    if todo:
-        kw = {"precedents": precedents, "conv_id": conv["conversation_id"]}
+    kw = {"precedents": precedents, "conv_id": conv["conversation_id"]}
+    if todo and config.EVAL_MODE == "single":
+        # Экономный режим: все критерии одним вызовом; что модель вернула криво — дооцениваем по одному.
+        results, missing = await evaluate_all_in_one(todo, prepared, precedents, conv["conversation_id"], key)
+        if missing:
+            results += await asyncio.gather(*[evaluate_criterion(c, prepared, 1, key, schema, **kw) for c in missing])
+    elif todo:
         results.append(await evaluate_criterion(todo[0], prepared, samples, key, schema, **kw))
         results += await asyncio.gather(*[evaluate_criterion(c, prepared, samples, key, schema, **kw) for c in todo[1:]])
     # Если ИИ не ответил ни по одному критерию (нет кредитов, сеть) — не сохраняем пустую оценку поверх хорошей.
@@ -357,7 +417,9 @@ async def evaluate(conv: dict, checklist: dict, samples: int | None = None, prev
     meta = {
         "model": config.LLM_MODEL,
         "samples": samples,
-        "llm_calls": len(results) * samples + sum(
+        "eval_mode": config.EVAL_MODE,
+        "llm_calls": (len(results) * samples if config.EVAL_MODE != "single"
+                      else (1 if results else 0) + sum(1 for r in results if not r.get("single_call") and r.get("usage", {}).get("input"))) + sum(
             1 for r in results if (r.get("verification") or {}).get("verdict") in ("confirmed", "changed")),
         "reused_criteria": sorted(reused),
         "usage": usage,
