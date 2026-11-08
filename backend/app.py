@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import config, criterion_tests, dataset, db, evaluator, intake, llm, preprocess, results_export, review_queue, scoring
+from . import config, criterion_tests, dataset, debate, db, evaluator, intake, llm, preprocess, results_export, review_queue, scoring
 
 app = FastAPI(title="CQA — Conversation Quality Analytics")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -666,6 +666,33 @@ async def test_criterion(req: CriterionTestReq):
         return await criterion_tests.run(c, req.n)
     except RuntimeError as e:
         raise HTTPException(502, str(e))
+
+
+class DebateReq(BaseModel):
+    criterion_id: str
+
+
+@app.post("/api/evaluations/{ev_id}/debate")
+async def debate_api(ev_id: int, req: DebateReq):
+    """«Суд» по спорному критерию: обвинитель и защитник (2 вызова ИИ), решает супервизор."""
+    ev = db.get_evaluation(ev_id)
+    if not ev:
+        raise HTTPException(404, "Оценка не найдена")
+    if not any(c["id"] == req.criterion_id for c in ev["checklist_snapshot"]["criteria"]):
+        raise HTTPException(404, "Критерий не найден в оценке")
+    if not llm.is_configured():
+        raise HTTPException(400, "LLM не настроена: задайте ключ в .env")
+    conv = db.get_conversation(ev["conversation_id"])
+    comment = next((a["data"].get("comment") for a in db.list_appeals(conversation_id=ev["conversation_id"])
+                    if a["evaluation_id"] == ev_id and a["criterion_id"] == req.criterion_id), None)
+    try:
+        result = await debate.run(conv, ev, req.criterion_id, comment)
+    except RuntimeError as e:
+        raise HTTPException(502, str(e))
+    result["at"] = db.now()
+    ev.setdefault("debates", {})[req.criterion_id] = result
+    db.update_evaluation(ev)
+    return result
 
 
 @app.get("/api/audit")

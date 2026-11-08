@@ -549,6 +549,20 @@ h1,h2,h3,h4,.ttl,.t-head h2{font-family:var(--font-h);letter-spacing:-.01em}
 
 /* дорожки речи (как в макете: Клиент / Оператор) */
 #pfBody.hidden{display:none}
+.db-box{margin-top:10px;border:1px solid var(--n40);border-radius:8px;padding:10px 12px;background:#fff}
+.db-empty{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.db-top{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:8px}
+.db-hint{font-size:11.5px;color:var(--n80)}
+.db-cols{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:1380px){.db-cols{grid-template-columns:1fr}}
+.db-side{border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+.db-side.prosecution{background:#fdf1f2;border:1px solid #f1c7cb}
+.db-side.defense{background:var(--g50);border:1px solid #b7dbc8}
+.db-h{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:13px}
+.db-arg{margin:0;font-size:12.5px;line-height:1.45}
+.db-weak{margin:0;font-size:12px;color:var(--n80)}
+.db-ev .ev{margin:0 4px 4px 0}
+.db-side .debate-take{align-self:flex-start}
 .ct-box{border-top:1px dashed var(--n40);padding-top:8px;text-transform:none;letter-spacing:0;font-weight:400}
 .ct-head{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .ct-hint{font-size:11.5px;color:var(--n80);flex:1;min-width:220px}
@@ -1357,6 +1371,7 @@ function critItem(ev,c,i){
   if(rev)body+='<div class="box review"><div class="h">Пересмотр · '+esc(rev.reviewer||'Супервизор')+' · '+fmtDate(rev.at)+'</div>'+
     (rev.from===rev.to?'Оценка оставлена без изменений: <b>'+esc(plainVal(c,uiVal(c,rev.to)))+'</b>':'ИИ: <b>'+esc(plainVal(c,aiV))+'</b> → супервизор: <b>'+esc(plainVal(c,uiVal(c,rev.to)))+'</b>')+
     '<br>'+esc(rev.reason)+(rev.total_before!=null?'<br><span style="color:var(--n80)">Итог: '+fmt(rev.total_before)+' → '+fmt(rev.total_after)+'</span>':'')+'</div>';
+  body+=debateHtml(c,(ev.debates||{})[c.id],state.role==='supervisor'||openAppeal);
   if(state.role==='supervisor'){
     body+='<div class="rev-form" data-cid="'+c.id+'"><div class="k" style="font-size:11px;font-weight:700;color:var(--n80);text-transform:uppercase;margin-bottom:6px">Блок ревьюера (супервизор)</div>'+
       '<label>Новая оценка<select class="rev-val">'+allowed(c).map(o=>'<option value="'+esc(o)+'"'+(String(o)===String(v)?' selected':'')+'>'+esc(o)+'</option>').join('')+'</select></label>'+
@@ -1406,6 +1421,23 @@ function coachingBlock(ev){
     (co.tips&&co.tips.length?'<div class="coach-k">Что улучшить</div>'+co.tips.map(t=>'<div class="tip"><div class="tip-h"><span class="b gray">'+esc(t.criterion)+'</span>'+(msgById(t.msg_id)?'<button class="ev" data-mid="'+esc(t.msg_id)+'"><span class="tm">▶ '+esc(msgById(t.msg_id).clock)+'</span></button>':'')+'</div>'+
       '<div>'+esc(t.problem)+'</div><div class="better">Лучше сказать: «'+esc(t.better_phrase)+'»</div></div>').join(''):'<div class="small-muted">Замечаний нет.</div>')+
     (co.for_total!=null&&co.for_total!==ev.final_score.total?'<div class="small-muted">Советы даны при итоге '+fmt(co.for_total)+' — после пересмотра можно обновить.</div>':'')+'</div>';
+}
+/* «СУД» ИЗ ДВУХ ИИ: обвинитель и защитник по спорному критерию, решает супервизор */
+function debateSide(c,s,key){
+  const t=key==='prosecution'?'Обвинение':'Защита';
+  return '<div class="db-side '+key+'"><div class="db-h"><b>'+t+'</b><span class="b '+(key==='prosecution'?'err':'ok')+'">'+esc(s.position_label||'')+'</span>'+
+    (s.concede?'<span class="b gray" title="Сторона признала, что её позиция не защищается">признаёт неправоту</span>':'')+'</div>'+
+    '<p class="db-arg">'+esc(s.argument||'')+'</p>'+
+    ((s.evidence||[]).length?'<div class="db-ev">'+evChips(s.evidence)+'</div>':'')+
+    (s.weakest_point_of_other_side?'<p class="db-weak"><i>Слабое место оппонента:</i> '+esc(s.weakest_point_of_other_side)+'</p>':'')+
+    (state.role==='supervisor'?'<button class="btn sm debate-take" data-cid="'+esc(c.id)+'" data-side="'+key+'">Принять позицию: '+esc(s.position_label||'')+'</button>':'')+'</div>';
+}
+function debateHtml(c,d,canRun){
+  if(state.dbBusy===c.id)return '<div class="db-box"><span class="spin"></span> Обвинитель и защитник изучают диалог…</div>';
+  if(!d)return canRun?'<div class="db-box db-empty"><button class="btn sm debate-run" data-cid="'+esc(c.id)+'">⚖ Суд ИИ: доводы обеих сторон</button><span class="db-hint">два независимых ИИ — за строгий и за мягкий ответ, с цитатами; решаете вы · 2 вызова ИИ</span></div>':'';
+  return '<div class="db-box"><div class="db-top"><b>⚖ Суд ИИ</b><span class="db-hint">'+(d.agree?'обе стороны пришли к одному ответу — спор, по сути, снят':'стороны расходятся — решает супервизор')+' · '+fmtDate(d.at)+'</span>'+
+    (canRun?'<button class="linkbtn debate-run" data-cid="'+esc(c.id)+'">заново</button>':'')+'</div>'+
+    '<div class="db-cols">'+debateSide(c,d.prosecution||{},'prosecution')+debateSide(c,d.defense||{},'defense')+'</div></div>';
 }
 function shortReason(r){
   // «Завершение — Нет. После ответа…» → «После ответа…»: название и ответ уже видны в строке
@@ -2395,6 +2427,28 @@ function bind(){
     const oc=e.target.closest('[data-opencrit]');if(oc){openCriterion(oc.dataset.opencrit);return;}
     const ev=e.target.closest('.ev');if(ev){goToMsg(ev.dataset.mid,ev.dataset.range?ev.dataset.range.split(','):null);return;}
     const ap=e.target.closest('.btn-appeal');if(ap){e.stopPropagation();openAppeal(ap.dataset.cid);return;}
+    const dr=e.target.closest('.debate-run');
+    if(dr){
+      const d=state.detail,cid=dr.dataset.cid;if(state.dbBusy)return;
+      state.dbBusy=cid;state.open.add(d.conversation_id+':'+cid);renderScorecard();
+      api('/evaluations/'+d.evaluation.id+'/debate',{method:'POST',body:{criterion_id:cid}})
+        .then(r=>{d.evaluation.debates=d.evaluation.debates||{};d.evaluation.debates[cid]=r;
+          toast(r.agree?'Суд ИИ: обе стороны согласны — '+r.prosecution.position_label:'Суд ИИ: обвинение — '+r.prosecution.position_label+', защита — '+r.defense.position_label,'info',5000);})
+        .catch(err=>toast(err.message,'err'))
+        .finally(()=>{state.dbBusy=null;renderScorecard();});
+      return;
+    }
+    const dt=e.target.closest('.debate-take');
+    if(dt){
+      const d=state.detail,cid=dt.dataset.cid,side=d.evaluation.debates[cid][dt.dataset.side];
+      const c=d.evaluation.checklist_snapshot.criteria.find(x=>x.id===cid);
+      const form=$('#scorePane .rev-form[data-cid="'+CSS.escape(cid)+'"]');if(!form)return;
+      const want=String(uiVal(c,side.position));
+      const sel=$('.rev-val',form);[...sel.options].forEach(o=>{if(String(o.value)===want)sel.value=o.value;});
+      $('.rev-reason',form).value='Принята позиция '+(dt.dataset.side==='prosecution'?'обвинения':'защиты')+': '+side.argument;
+      form.scrollIntoView({behavior:'smooth',block:'center'});toast('Позиция подставлена в вердикт — проверьте и сохраните','info',3500);
+      return;
+    }
     const sv=e.target.closest('.save-verdict');
     if(sv){
       const form=sv.closest('.rev-form'),cid=form.dataset.cid,d=state.detail,evl=d.evaluation;
