@@ -575,6 +575,27 @@ table.t.ct-tbl{min-width:0;margin-top:6px;font-size:12.5px}
 .ct-dlg{margin-top:4px;padding:6px 8px;background:var(--n10);border-radius:4px;font-size:12px;line-height:1.45}
 .ct-why{margin-top:4px;color:var(--n80);font-style:italic}
 .ct-tip{font-size:12px;color:var(--warn);margin-top:6px}
+.wi{margin:0 18px 12px;border:1px solid #b6d4ee;border-radius:10px;background:linear-gradient(180deg,#f3f8fd,#fff);padding:12px 14px}
+.wi:empty{display:none}
+.wi-h{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}.wi-h span{font-size:12px;color:var(--n80)}
+.wi-tiles{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+.wi-t{flex:1 1 160px;background:#fff;border:1px solid var(--n30);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column}
+.wi-t span{font-size:11px;color:var(--n80);text-transform:uppercase;letter-spacing:.3px;font-weight:700}
+.wi-t b{font-size:20px;font-variant-numeric:tabular-nums}.wi-t i{font-style:normal;font-size:12px;color:var(--n80)}
+.wi-t i.down{color:var(--err);font-weight:700}.wi-t i.up{color:var(--ok);font-weight:700}
+.wi-top{font-size:12px;color:var(--n80);margin-top:8px}
+.wi-pend{font-size:12.5px;color:var(--warn);background:var(--warn-bg);border-radius:6px;padding:6px 10px;margin-top:8px}
+.rk-cats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;padding:14px 18px 0}
+.rk-c{border:1px solid var(--n30);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;background:var(--n10)}
+.rk-c b{font-size:22px}.rk-c span{font-size:12px;color:var(--n80)}
+.rk-c.hit{background:var(--err-bg);border-color:#f1b8bc}.rk-c.hit b{color:var(--err)}
+.rk-row{margin:0 18px 10px;border:1px solid var(--n40);border-radius:8px;padding:10px 12px}
+.rk-rh{display:flex;gap:8px;align-items:center;margin-bottom:6px}.rk-rh .rk-confirm{margin-left:auto}
+.rk-hit{padding:6px 0;border-top:1px dashed var(--n30);font-size:13px}
+.rk-q{color:var(--n100)}.rk-why{font-size:12px;color:var(--n80);margin-top:2px}.rk-ai{font-size:12px;margin-top:3px}
+.fr-n{display:block;font-size:10.5px;color:var(--n80)}
+.fr-strict{background:#fde7e9}.fr-soft{background:var(--ok-bg)}
+tr.fr-flag td:first-child{font-weight:700}
 .au-verdict{padding:12px 18px 0}
 .au-ok{padding:10px 12px;border-radius:8px;background:var(--ok-bg);color:var(--ok);font-weight:600}
 .au-bad{padding:10px 12px;border-radius:8px;background:var(--err-bg);color:var(--err);border:1px solid #f1b8bc}
@@ -790,6 +811,7 @@ table.t tbody tr:hover{background:var(--g50)}
         </table>
       </div>
       <div class="errs" id="setErrors"></div>
+      <div class="wi" id="wiPanel" aria-live="polite"></div>
       <div class="set-foot">
         <span class="sumbox ok" id="sumBox">Σ весов: 100.00 / 100</span>
         <button class="btn" id="btnNormalize">Нормализовать до 100</button>
@@ -1800,6 +1822,26 @@ function updateSum(){
   const errs=validateDraft();
   $('#setErrors').innerHTML=errs.map(e=>'<div>⚠ '+esc(e)+'</div>').join('');
   $('#btnApply').disabled=!(ok&&errs.length===0)||!!state.job;
+  schedulePreview();
+}
+/* «ЧТО БУДЕТ, ЕСЛИ…»: пересчёт итогов с черновиком по готовым ответам, без вызовов ИИ */
+function schedulePreview(){
+  clearTimeout(state.wiT);
+  state.wiT=setTimeout(async()=>{
+    const el=$('#wiPanel');if(!el||!state.draft)return;
+    const ds=state.filters.dataset!=='all'?state.filters.dataset:(state.datasets.indexOf('DEV')>=0?'DEV':null);
+    let r;try{r=await api('/checklists/preview',{method:'POST',body:{checklist:cleanDraft(),dataset:ds}});}catch(e){el.innerHTML='';return;}
+    if(!r.n){el.innerHTML='';return;}
+    const same=r.avg_before===r.avg_after&&!r.pending.length;
+    const d=(r.avg_after!=null&&r.avg_before!=null)?r.avg_after-r.avg_before:0;
+    el.innerHTML='<div class="wi-h"><b>Что будет, если применить</b><span>'+(same?'изменений в итогах нет':'пересчёт по уже готовым ответам '+r.n+' диалогов'+(ds?' набора '+esc(ds):'')+', без вызовов ИИ')+'</span></div>'+
+      (same?'':'<div class="wi-tiles">'+
+        '<div class="wi-t"><span>Средний балл</span><b>'+fmt(r.avg_before)+' → '+fmt(r.avg_after)+'</b><i class="'+(d<0?'down':d>0?'up':'')+'">'+(d>0?'+':'')+fmt(d)+'</i></div>'+
+        '<div class="wi-t"><span>Ниже 60 баллов</span><b>'+r.below60_before+' → '+r.below60_after+'</b><i>диалогов</i></div>'+
+        '<div class="wi-t"><span>Итог изменится</span><b>'+r.changed+'</b><i>из '+r.n+'</i></div></div>'+
+        (r.top.length?'<div class="wi-top">Сильнее всего: '+r.top.slice(0,4).map(t=>esc(t.conversation_id)+' '+fmt(t.before)+'→'+fmt(t.after)).join(' · ')+'</div>':''))+
+      (r.pending.length?'<div class="wi-pend">⚠ Изменена формулировка или шкала: <b>'+r.pending.map(x=>esc(x.name)).join(', ')+'</b> — эти критерии ИИ оценит заново при применении; в предпросмотре они временно исключены (вес перераспределён).</div>':'');
+  },350);
 }
 function newDraft(cl){
   state.draft=clone(cl||state.checklist);
@@ -1904,7 +1946,7 @@ async function renderStatsInner(){
   const cl=state.checklist,ev=state.list.filter(d=>d.evaluation);
   const avg=a=>a.length?a.reduce((s,x)=>s+(x||0),0)/a.length:null;
   const byLang={};ev.forEach(d=>{(byLang[d.language]=byLang[d.language]||[]).push(d.evaluation.total);});
-  let html=(await queueCard())+(await auditCard())+(await grossCard())+'<div class="card"><header><h2>Сводка по оценкам</h2><p>Активный чек-лист: '+esc(cl.name)+' v'+cl.version+'</p></header><div class="stat-grid">'+
+  let html=(await queueCard())+(await risksCard())+(await fairnessCard())+(await auditCard())+(await grossCard())+'<div class="card"><header><h2>Сводка по оценкам</h2><p>Активный чек-лист: '+esc(cl.name)+' v'+cl.version+'</p></header><div class="stat-grid">'+
     '<div class="stat"><div class="n">Оценено</div><div class="v">'+ev.length+' / '+state.list.length+'</div></div>'+
     '<div class="stat"><div class="n">Средний балл</div><div class="v">'+fmt(avg(ev.map(d=>d.evaluation.total)))+'</div></div>'+
     Object.keys(byLang).sort().map(l=>'<div class="stat"><div class="n">'+esc(l)+'</div><div class="v">'+fmt(avg(byLang[l]))+'</div><div class="s">'+byLang[l].length+' диалогов</div></div>').join('')+
@@ -1981,6 +2023,37 @@ async function auditCard(){
     '<div id="auVerdict" class="au-verdict">'+auditVerdict(v)+'</div>'+
     '<div class="tbl-wrap"><table class="t" style="min-width:600px"><thead><tr><th>№</th><th>Время</th><th>Событие</th><th>Что</th><th>Хэш</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
     '<div class="set-foot"><button class="btn primary" id="auVerify">Проверить целостность</button><span class="q-note" style="margin:0">Голова цепочки: <code>'+esc((v.head_hash||'').slice(0,16))+'…</code></span></div></div>';
+}
+/* СКАНЕР РЕГУЛЯТОРНЫХ РИСКОВ: шаблоны RU/KZ/EN по репликам оператора, ИИ подтверждает по кнопке */
+async function risksCard(){
+  const ds=state.filters.dataset!=='all'?state.filters.dataset:'';
+  let r;try{r=await api('/risks'+(ds?'?dataset='+encodeURIComponent(ds):''));}catch(e){return '';}
+  state.risks=r;
+  const cats=Object.keys(r.categories).map(k=>'<div class="rk-c'+(r.by_category[k]?' hit':'')+'"><b>'+(r.by_category[k]||0)+'</b><span>'+esc(r.categories[k])+'</span></div>').join('');
+  const rows=r.rows.map(row=>'<div class="rk-row" data-conv="'+esc(row.conversation_id)+'"><div class="rk-rh"><a href="#" class="go-q" data-id="'+esc(row.conversation_id)+'"><b>'+esc(row.conversation_id)+'</b></a><span class="b lang">'+esc(row.language||'')+'</span>'+
+      '<button class="btn sm rk-confirm" data-conv="'+esc(row.conversation_id)+'">Проверить ИИ</button></div>'+
+    row.hits.map(h=>'<div class="rk-hit" data-msg="'+esc(h.msg_id)+'" data-cat="'+esc(h.category)+'"><span class="b err">'+esc(h.name)+'</span> <span class="rk-q">'+esc(h.msg_id)+' · «'+esc(h.quote)+'»</span><div class="rk-why">'+esc(h.why)+'</div><div class="rk-ai"></div></div>').join('')+'</div>').join('');
+  return '<div class="card rk-card"><header><h2>Регуляторные риски</h2><p>Сверх чек-листа и без влияния на балл: обещание доходности, персональные инвестиционные советы, уход от компании (личная карта, частная консультация, личные контакты), запрос пароля, CVV или PIN. Поиск по шаблонам на RU/KZ/EN — мгновенно и бесплатно; «Проверить ИИ» подтверждает или отклоняет находки (1 вызов).</p></header>'+
+    '<div class="rk-cats">'+cats+'</div>'+
+    '<div class="q-note">Проверено диалогов: '+r.dialogs_scanned+' · с рисками: <b>'+r.dialogs_with_risks+'</b></div>'+
+    (rows||'<div class="empty">Рисков не найдено</div>')+'</div>';
+}
+/* СПРАВЕДЛИВОСТЬ МЕЖДУ ЯЗЫКАМИ: не строже ли ИИ к одному языку (и чем эталон на том же языке) */
+async function fairnessCard(){
+  const ds=state.filters.dataset!=='all'?state.filters.dataset:'';
+  let f;try{f=await api('/fairness'+(ds?'?dataset='+encodeURIComponent(ds):''));}catch(e){return '';}
+  if(!f.languages||f.languages.length<2)return '';
+  const pc=v=>v==null?'—':Math.round(v*100)+'%';
+  const head='<tr><th style="text-align:left">Критерий</th>'+f.languages.map(l=>'<th>'+esc(l)+(f.has_gold?' · ИИ / эталон':'')+'</th>').join('')+'<th>Перекос</th></tr>';
+  const rows=f.criteria.map(c=>'<tr'+(c.flag?' class="fr-flag"':'')+'><td>'+esc(c.name)+'</td>'+f.languages.map(l=>{const x=c.cells[l]||{};
+      const b=x.bias;const cls=b==null?'':b>=0.15?'fr-strict':b<=-0.15?'fr-soft':'';
+      return '<td class="'+cls+'" title="ответов «не в пользу оператора»: ИИ '+pc(x.ai_rate)+(f.has_gold?', эталон '+pc(x.gold_rate):'')+' · n='+(x.n||0)+'">'+pc(x.ai_rate)+(f.has_gold?' / '+pc(x.gold_rate):'')+'<span class="fr-n">n='+(x.n||0)+'</span></td>';}).join('')+
+    '<td>'+(c.flag?'<span class="b warn">'+(c.bias_spread!=null?'ИИ строже эталона на одном языке (±'+Math.round(c.bias_spread*100)+' п.п.)':'разброс '+Math.round(c.spread*100)+' п.п.')+'</span>':'<span class="b ok">ровно</span>')+'</td></tr>').join('');
+  const tot=f.languages.map(l=>{const t=f.totals[l]||{};return '<div class="stat"><div class="n">'+esc(l)+' · '+t.dialogs+' диал.</div><div class="v">'+fmt(t.avg_total)+'</div>'+(t.accuracy!=null?'<div class="s">совпадение с эталоном '+Math.round(t.accuracy*1000)/10+'%</div>':'')+'</div>';}).join('');
+  return '<div class="card fr-card"><header><h2>Справедливость между языками</h2><p>Не оценивает ли ИИ один язык строже другого. В ячейке — доля ответов «не в пользу оператора» («Нет», неполный балл, нарушение)'+(f.has_gold?' у ИИ и у эталона на том же языке: перекос — когда ИИ строже людей именно на одном языке':'')+'.</p></header>'+
+    '<div class="stat-grid">'+tot+'<div class="stat"><div class="n">Критериев с перекосом</div><div class="v">'+f.flags+'</div></div></div>'+
+    '<div class="tbl-wrap"><table class="t" style="min-width:700px">'+head+rows+'</table></div>'+
+    '<p class="q-note">Красным — ИИ заметно строже эталона на этом языке, зелёным — мягче. На маленьких выборках (n&lt;5) выводы предварительные.</p></div>';
 }
 function resultsCard(){
   const ds=state.datasets||[];
@@ -2523,6 +2596,12 @@ function bind(){
   });
   /* сводка */
   $('#statsPane').addEventListener('click',e=>{
+    const rc=e.target.closest('.rk-confirm');
+    if(rc){busy(rc,true,'Проверяю…');
+      api('/risks/confirm',{method:'POST',body:{conversation_id:rc.dataset.conv}}).then(r=>{busy(rc,false);
+        r.hits.forEach(h=>{const el=$('.rk-row[data-conv="'+CSS.escape(r.conversation_id)+'"] .rk-hit[data-msg="'+CSS.escape(h.msg_id)+'"][data-cat="'+CSS.escape(h.category)+'"] .rk-ai');
+          if(el)el.innerHTML=(h.confirmed===true?'<span class="b err">ИИ: риск подтверждён</span> ':h.confirmed===false?'<span class="b ok">ИИ: ложная тревога</span> ':'')+esc(h.ai_reason||'');});
+      }).catch(err=>{busy(rc,false);toast(err.message,'err');});return;}
     const av=e.target.closest('#auVerify');if(av){busy(av,true,'Проверяю…');api('/audit/verify').then(v=>{busy(av,false);$('#auVerdict').innerHTML=auditVerdict(v);toast(v.ok?'Целостность журнала подтверждена':'Обнаружено изменение данных в обход системы',v.ok?'ok':'err');}).catch(err=>{busy(av,false);toast(err.message,'err');});return;}
     const gq=e.target.closest('.go-q');if(gq){e.preventDefault();setView('dialogs');selectDialog(gq.dataset.id,true);return;}
     if(e.target.closest('#qOpenList')){state.filters.sort='attention';setView('dialogs');renderFilters();renderList();renderListActions();const f=filtered()[0];if(f)selectDialog(f.conversation_id,true);return;}

@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import config, criterion_tests, dataset, debate, db, evaluator, intake, llm, preprocess, results_export, review_queue, scoring
+from . import config, criterion_tests, dataset, debate, insights, risks, db, evaluator, intake, llm, preprocess, results_export, review_queue, scoring
 
 app = FastAPI(title="CQA — Conversation Quality Analytics")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -693,6 +693,58 @@ async def debate_api(ev_id: int, req: DebateReq):
     ev.setdefault("debates", {})[req.criterion_id] = result
     db.update_evaluation(ev)
     return result
+
+
+class PreviewReq(BaseModel):
+    checklist: dict[str, Any]
+    dataset: str | None = None
+
+
+@app.post("/api/checklists/preview")
+def checklist_preview(req: PreviewReq):
+    """«Что будет, если…»: итоги с черновиком чек-листа по готовым ответам, без вызовов модели."""
+    draft = {k: v for k, v in req.checklist.items() if k not in ("version", "saved_at", "active", "versions")}
+    if not draft.get("criteria"):
+        raise HTTPException(400, "В черновике нет критериев")
+    ids = {c["conversation_id"] for c in db.list_conversations(req.dataset)} if req.dataset else None
+    return insights.preview_checklist(draft, db.active_checklist(), db.latest_evaluations_map(), ids)
+
+
+@app.get("/api/fairness")
+def fairness_api(dataset: str | None = None):
+    """Справедливость между языками: не оценивает ли ИИ один язык строже другого (и строже эталона)."""
+    convs = db.list_conversations(dataset)
+    ids = {c["conversation_id"] for c in convs}
+    latest = {k: v for k, v in db.latest_evaluations_map().items() if k in ids}
+    if not latest:
+        return {"languages": [], "criteria": [], "totals": {}, "has_gold": False, "flags": 0}
+    langs = {c["conversation_id"]: c.get("language") for c in convs}
+    return insights.fairness(latest, langs, _load_gold() or None)
+
+
+@app.get("/api/risks")
+def risks_api(dataset: str | None = None):
+    """Сканер регуляторных рисков по репликам оператора (шаблоны RU/KZ/EN, без ИИ)."""
+    convs = [db.get_conversation(c["conversation_id"]) for c in db.list_conversations(dataset)]
+    return risks.scan_all(convs)
+
+
+class RiskConfirmReq(BaseModel):
+    conversation_id: str
+
+
+@app.post("/api/risks/confirm")
+async def risks_confirm(req: RiskConfirmReq):
+    """ИИ подтверждает или отклоняет найденные шаблоном риски в диалоге (1 вызов)."""
+    conv = db.get_conversation(req.conversation_id)
+    if not conv:
+        raise HTTPException(404, "Диалог не найден")
+    if not llm.is_configured():
+        raise HTTPException(400, "LLM не настроена: задайте ключ в .env")
+    try:
+        return {"conversation_id": req.conversation_id, "hits": await risks.confirm(conv, risks.scan(conv))}
+    except RuntimeError as e:
+        raise HTTPException(502, str(e))
 
 
 @app.get("/api/audit")
