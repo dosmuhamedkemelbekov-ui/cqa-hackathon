@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import config, dataset, db, evaluator, intake, llm, preprocess, results_export, review_queue, scoring
+from . import config, criterion_tests, dataset, db, evaluator, intake, llm, preprocess, results_export, review_queue, scoring
 
 app = FastAPI(title="CQA — Conversation Quality Analytics")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -638,6 +638,46 @@ def _load_gold() -> dict:
 
 class GoldReq(BaseModel):
     answers: dict[str, str]
+
+
+class CriterionTestReq(BaseModel):
+    criterion: dict[str, Any]
+    n: int | None = None
+
+
+@app.post("/api/checklists/test-criterion")
+async def test_criterion(req: CriterionTestReq):
+    """Тесты критерия до применения: ИИ генерирует диалоги с заданным ответом и оценивает их этим критерием."""
+    if not llm.is_configured():
+        raise HTTPException(400, "LLM не настроена: задайте ключ в .env")
+    c = dict(req.criterion)
+    if c.get("type") not in ("binary", "scale", "flag") or not c.get("name") or not c.get("rule"):
+        raise HTTPException(400, "Заполните название, тип и правило критерия")
+    if c["type"] == "scale":
+        try:
+            c["scale"] = [{"value": int(float(s["value"])) if float(s["value"]).is_integer() else float(s["value"]),
+                           "label": s.get("label", "")} for s in c.get("scale") or []]
+        except (KeyError, TypeError, ValueError):
+            raise HTTPException(400, "Некорректная шкала")
+        if len(c["scale"]) < 2:
+            raise HTTPException(400, "У шкалы должно быть минимум две ступени")
+    c.setdefault("id", "new")
+    try:
+        return await criterion_tests.run(c, req.n)
+    except RuntimeError as e:
+        raise HTTPException(502, str(e))
+
+
+@app.get("/api/audit")
+def audit(limit: int = 30):
+    """Журнал для регулятора: последние события (сохранение оценок, решения, апелляции, смены чек-листа)."""
+    return db.list_audit(min(200, max(1, limit)))
+
+
+@app.get("/api/audit/verify")
+def audit_verify():
+    """Проверка целостности: пересчёт цепочки хэшей и сверка текущих записей с зафиксированными отпечатками."""
+    return db.verify_audit()
 
 
 @app.get("/api/review-queue")

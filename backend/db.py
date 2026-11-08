@@ -1,4 +1,5 @@
 """Хранилище на SQLite. Сущности хранятся как JSON-документы — так проще менять схему во время хакатона."""
+import hashlib
 import json
 import sqlite3
 import threading
@@ -62,9 +63,15 @@ def init() -> None:
                 conversation_id TEXT, criterion_id TEXT, status TEXT, data TEXT,
                 created_at TEXT, resolved_at TEXT);
             CREATE INDEX IF NOT EXISTS ix_eval_conv ON evaluations(conversation_id);
+            CREATE TABLE IF NOT EXISTS audit_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, kind TEXT, ref TEXT,
+                digest TEXT, payload TEXT, prev_hash TEXT, hash TEXT);
+            CREATE INDEX IF NOT EXISTS ix_audit_ref ON audit_log(ref);
             """
         )
         _conn.commit()
+        if not _conn.execute("SELECT 1 FROM audit_log LIMIT 1").fetchone():
+            _audit_baseline()
     if not list_checklists():
         cl = json.loads(DEFAULT_CHECKLIST.read_text(encoding="utf-8"))
         save_checklist({**cl, "source": "default"})
@@ -159,10 +166,13 @@ def save_checklist(cl: dict) -> dict:
         row = _conn.execute("SELECT MAX(version) v FROM checklists WHERE id=?", (cl["id"],)).fetchone()
         version = (row["v"] or 0) + 1
         cl = {**cl, "version": version, "saved_at": now()}
+        text = json.dumps(cl, ensure_ascii=False)
         _conn.execute(
             "INSERT INTO checklists(id, version, data, created_at) VALUES(?,?,?,?)",
-            (cl["id"], version, json.dumps(cl, ensure_ascii=False), cl["saved_at"]),
+            (cl["id"], version, text, cl["saved_at"]),
         )
+        _audit("checklist_saved", f"checklist:{cl['id']}:v{version}", text,
+               {"version": version, "criteria": len(cl.get("criteria", [])), "source": cl.get("source")})
         _conn.commit()
     return cl
 
@@ -207,14 +217,20 @@ def save_evaluation(ev: dict) -> dict:
         )
         _conn.commit()
         ev = {**ev, "id": cur.lastrowid}
-        _conn.execute("UPDATE evaluations SET data=? WHERE id=?", (json.dumps(ev, ensure_ascii=False), ev["id"]))
+        text = json.dumps(ev, ensure_ascii=False)
+        _conn.execute("UPDATE evaluations SET data=? WHERE id=?", (text, ev["id"]))
+        _audit("evaluation_saved", f"evaluation:{ev['id']}", text, _ev_summary(ev))
         _conn.commit()
     return ev
 
 
 def update_evaluation(ev: dict) -> None:
     with _lock:
-        _conn.execute("UPDATE evaluations SET data=? WHERE id=?", (json.dumps(ev, ensure_ascii=False), ev["id"]))
+        text = json.dumps(ev, ensure_ascii=False)
+        _conn.execute("UPDATE evaluations SET data=? WHERE id=?", (text, ev["id"]))
+        last = (ev.get("decisions") or [None])[-1]
+        _audit("evaluation_updated", f"evaluation:{ev['id']}", text,
+               {**_ev_summary(ev), "decision": last})
         _conn.commit()
 
 
@@ -271,6 +287,8 @@ def create_appeal(evaluation_id: int, conversation_id: str, criterion_id: str, d
             "VALUES(?,?,?,?,?,?)",
             (evaluation_id, conversation_id, criterion_id, "open", json.dumps(data, ensure_ascii=False), now()),
         )
+        _audit("appeal_created", f"appeal:{cur.lastrowid}", _appeal_text(cur.lastrowid),
+               {"conversation_id": conversation_id, "criterion_id": criterion_id, "evaluation_id": evaluation_id})
         _conn.commit()
     return get_appeal(cur.lastrowid)
 
@@ -303,5 +321,96 @@ def resolve_appeal(appeal_id: int, status: str, data: dict) -> dict:
             "UPDATE appeals SET status=?, data=?, resolved_at=? WHERE id=?",
             (status, json.dumps(data, ensure_ascii=False), now(), appeal_id),
         )
+        _audit("appeal_resolved", f"appeal:{appeal_id}", _appeal_text(appeal_id),
+               {"status": status, "new_answer": data.get("new_answer"), "reviewer": data.get("reviewer")})
         _conn.commit()
     return get_appeal(appeal_id)
+
+
+# ---------- журнал для регулятора: цепочка хэшей ----------
+# Каждое событие хранит отпечаток (SHA-256) содержимого записи и хэш, сцепленный с предыдущим событием.
+# Изменить оценку/апелляцию/чек-лист в обход системы или подменить запись журнала незаметно нельзя:
+# verify_audit() пересчитывает цепочку и сверяет текущие данные с последним зафиксированным отпечатком.
+GENESIS = "0" * 64
+
+
+def _sha(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _chain_hash(prev: str, ts: str, kind: str, ref: str, digest: str, payload: str) -> str:
+    return _sha("|".join([prev, ts, kind, ref, digest, payload]))
+
+
+def _ev_summary(ev: dict) -> dict:
+    return {"conversation_id": ev.get("conversation_id"), "checklist_version": ev.get("checklist_version"),
+            "model": ev.get("model"), "ai_total": (ev.get("original_score") or {}).get("total"),
+            "final_total": (ev.get("final_score") or {}).get("total")}
+
+
+def _appeal_text(appeal_id: int) -> str:
+    row = _conn.execute("SELECT status, data FROM appeals WHERE id=?", (appeal_id,)).fetchone()
+    return (row["status"] or "") + "|" + (row["data"] or "") if row else ""
+
+
+def _audit(kind: str, ref: str, record_text: str, payload: dict) -> None:
+    """Вызывать под _lock, до commit — запись и событие журнала попадают в базу одной транзакцией."""
+    prev = _conn.execute("SELECT hash FROM audit_log ORDER BY id DESC LIMIT 1").fetchone()
+    prev_hash = prev["hash"] if prev else GENESIS
+    ts, digest = now(), _sha(record_text)
+    ptext = json.dumps(payload, ensure_ascii=False, sort_keys=True)
+    _conn.execute("INSERT INTO audit_log(ts, kind, ref, digest, payload, prev_hash, hash) VALUES(?,?,?,?,?,?,?)",
+                  (ts, kind, ref, digest, ptext, prev_hash, _chain_hash(prev_hash, ts, kind, ref, digest, ptext)))
+
+
+def _audit_baseline() -> None:
+    """Первый запуск журнала: фиксируем всё, что уже есть в базе, как точку отсчёта."""
+    for r in _conn.execute("SELECT id, version, data FROM checklists ORDER BY pk").fetchall():
+        d = json.loads(r["data"])
+        _audit("baseline", f"checklist:{d['id']}:v{r['version']}", r["data"], {"version": r["version"]})
+    for r in _conn.execute("SELECT id, data FROM evaluations ORDER BY id").fetchall():
+        _audit("baseline", f"evaluation:{r['id']}", r["data"], _ev_summary(json.loads(r["data"])))
+    for r in _conn.execute("SELECT id FROM appeals ORDER BY id").fetchall():
+        _audit("baseline", f"appeal:{r['id']}", _appeal_text(r["id"]), {})
+    _conn.commit()
+
+
+def list_audit(limit: int = 30) -> list[dict]:
+    rows = _conn.execute("SELECT * FROM audit_log ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+    out = []
+    for r in rows:
+        d = dict(r)
+        d["payload"] = json.loads(d["payload"] or "{}")
+        out.append(d)
+    return out
+
+
+def verify_audit() -> dict:
+    """Пересчитать цепочку и сверить текущие записи с последним зафиксированным отпечатком."""
+    rows = _conn.execute("SELECT * FROM audit_log ORDER BY id").fetchall()
+    prev, broken = GENESIS, None
+    last_digest: dict[str, tuple[str, int]] = {}
+    for r in rows:
+        if r["prev_hash"] != prev or _chain_hash(prev, r["ts"], r["kind"], r["ref"], r["digest"], r["payload"]) != r["hash"]:
+            broken = {"id": r["id"], "ts": r["ts"], "ref": r["ref"]}
+            break
+        prev = r["hash"]
+        last_digest[r["ref"]] = (r["digest"], r["id"])
+    tampered, unlogged = [], []
+    current: dict[str, str] = {}
+    for r in _conn.execute("SELECT id, data FROM evaluations"):
+        current[f"evaluation:{r['id']}"] = r["data"]
+    for r in _conn.execute("SELECT id FROM appeals"):
+        current[f"appeal:{r['id']}"] = _appeal_text(r["id"])
+    for r in _conn.execute("SELECT version, data FROM checklists"):
+        current[f"checklist:{json.loads(r['data'])['id']}:v{r['version']}"] = r["data"]
+    for ref, text in current.items():
+        if ref not in last_digest:
+            unlogged.append(ref)
+        elif _sha(text) != last_digest[ref][0]:
+            tampered.append({"ref": ref, "logged_event": last_digest[ref][1]})
+    missing = [ref for ref in last_digest if ref not in current]
+    ok = broken is None and not tampered and not unlogged and not missing
+    return {"ok": ok, "entries": len(rows), "head_hash": prev, "chain_broken_at": broken,
+            "tampered": tampered, "unlogged": unlogged, "deleted": missing, "records_checked": len(current),
+            "checked_at": now()}

@@ -549,6 +549,23 @@ h1,h2,h3,h4,.ttl,.t-head h2{font-family:var(--font-h);letter-spacing:-.01em}
 
 /* дорожки речи (как в макете: Клиент / Оператор) */
 #pfBody.hidden{display:none}
+.ct-box{border-top:1px dashed var(--n40);padding-top:8px;text-transform:none;letter-spacing:0;font-weight:400}
+.ct-head{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.ct-hint{font-size:11.5px;color:var(--n80);flex:1;min-width:220px}
+.ct-res{margin-top:8px;padding:8px 10px;border-radius:6px;font-size:13px;display:flex;gap:10px;flex-wrap:wrap;align-items:baseline}
+.ct-res.ok{background:var(--ok-bg);color:var(--ok)}.ct-res.warn{background:var(--warn-bg);color:var(--warn)}.ct-res.bad{background:var(--err-bg);color:var(--err)}
+.ct-meta{font-size:11.5px;opacity:.85}
+table.t.ct-tbl{min-width:0;margin-top:6px;font-size:12.5px}
+.ct-tbl td{vertical-align:top}.ct-fail td{background:#fff5f5}
+.ct-tbl details summary{cursor:pointer;color:var(--info);font-size:11.5px;margin-top:3px}
+.ct-dlg{margin-top:4px;padding:6px 8px;background:var(--n10);border-radius:4px;font-size:12px;line-height:1.45}
+.ct-why{margin-top:4px;color:var(--n80);font-style:italic}
+.ct-tip{font-size:12px;color:var(--warn);margin-top:6px}
+.au-verdict{padding:12px 18px 0}
+.au-ok{padding:10px 12px;border-radius:8px;background:var(--ok-bg);color:var(--ok);font-weight:600}
+.au-bad{padding:10px 12px;border-radius:8px;background:var(--err-bg);color:var(--err);border:1px solid #f1b8bc}
+.au-bad div{font-size:13px;margin-top:3px}
+.au-h{font-size:11px;color:var(--n80)}
 .q-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;padding:14px 18px 0}
 .q-m{border:1px solid var(--n30);border-radius:8px;padding:10px 12px;background:linear-gradient(180deg,var(--g50),#fff)}
 .q-m.wide{grid-column:span 2}@media (max-width:900px){.q-m.wide{grid-column:auto}}
@@ -1676,6 +1693,22 @@ function parseScale(str){
   if(u.length<2||u[0]<=0)return null;
   return u;
 }
+/* ТЕСТЫ КРИТЕРИЯ: понял ли ИИ формулировку — до применения к реальным диалогам */
+function ctestHtml(c){
+  const r=(state.ctests||{})[c.id];if(!r)return '';
+  if(r.sig)r.stale=r.sig!==JSON.stringify([c.name,c.type,c.rule,c.na_allowed,c.na_condition,c.guidance,c.scale]);
+  if(r.error)return '<div class="ct-res bad">Не удалось: '+esc(r.error)+'</div>';
+  const ok=r.passed===r.total;
+  return '<div class="ct-res '+(ok?'ok':'warn')+'"><b>'+(ok?'✓ ИИ понял критерий':'⚠ ИИ путается')+': '+r.passed+' из '+r.total+' тестов</b>'+
+    '<span class="ct-meta">'+r.llm_calls+' вызовов ИИ · '+r.duration_s+' с'+(r.stale?' · <b>формулировка изменена после теста — проверьте снова</b>':'')+'</span></div>'+
+    '<table class="t ct-tbl"><thead><tr><th></th><th>Язык</th><th>Ситуация</th><th>Ожидали</th><th>ИИ ответил</th></tr></thead><tbody>'+
+    r.cases.map(x=>'<tr class="'+(x.pass?'':'ct-fail')+'"><td>'+(x.pass?'✓':'✗')+'</td><td>'+esc(x.language)+(x.kind==='borderline'?' <span class="b warn">граница</span>':'')+'</td>'+
+      '<td>'+esc(x.scenario)+'<details><summary>диалог и объяснение ИИ</summary><div class="ct-dlg">'+
+        (x.messages||[]).map(m=>'<div><b>'+esc(speakerLabel(m))+':</b> '+esc(m.text)+'</div>').join('')+
+        '<div class="ct-why">ИИ: '+esc(x.rationale)+'</div></div></details></td>'+
+      '<td><b>'+esc(x.expected_label)+'</b></td><td>'+esc(x.got_label)+'</td></tr>').join('')+'</tbody></table>'+
+    (ok?'':'<div class="ct-tip">Подсказка: уточните «Уточнения для ИИ» для случаев с ✗ и запустите тесты снова.</div>');
+}
 function renderSettings(){
   const d=state.draft;if(!d)return;
   const secs=d.sections||[];
@@ -1701,6 +1734,9 @@ function renderSettings(){
         '<label>Секция<select class="in-sec">'+secs.map(s=>'<option value="'+esc(s.id)+'"'+(s.id===c.section?' selected':'')+'>'+esc(s.name)+'</option>').join('')+'</select></label>'+
         '<label>ID критерия<textarea class="in-id" style="min-height:30px" rows="1"'+(c._isNew?'':' disabled')+'>'+esc(c.id)+'</textarea></label>'+
         '<label>Код в выгрузке results.json<input type="text" class="in-code" value="'+esc(c.code||'')+'" placeholder="напр. closure — код заменяемого критерия"></label>'+
+        '<div class="full ct-box"><div class="ct-head"><button class="btn sm crit-test" type="button"'+(state.ctBusy===c.id?' disabled':'')+'>'+(state.ctBusy===c.id?'<span class="spin"></span> ИИ пишет и проверяет тестовые диалоги… (1–3 мин)':'🧪 Проверить критерий на тестах')+'</button>'+
+          '<span class="ct-hint">ИИ напишет 5–7 коротких диалогов с заранее известным ответом (RU/KZ/EN, один пограничный) и оценит их этим критерием — до применения к реальным диалогам. ~7 вызовов ИИ.</span></div>'+
+          ctestHtml(c)+'</div>'+
       '</div></td></tr>';
     }
     return row;
@@ -1836,7 +1872,7 @@ async function renderStatsInner(){
   const cl=state.checklist,ev=state.list.filter(d=>d.evaluation);
   const avg=a=>a.length?a.reduce((s,x)=>s+(x||0),0)/a.length:null;
   const byLang={};ev.forEach(d=>{(byLang[d.language]=byLang[d.language]||[]).push(d.evaluation.total);});
-  let html=(await queueCard())+(await grossCard())+'<div class="card"><header><h2>Сводка по оценкам</h2><p>Активный чек-лист: '+esc(cl.name)+' v'+cl.version+'</p></header><div class="stat-grid">'+
+  let html=(await queueCard())+(await auditCard())+(await grossCard())+'<div class="card"><header><h2>Сводка по оценкам</h2><p>Активный чек-лист: '+esc(cl.name)+' v'+cl.version+'</p></header><div class="stat-grid">'+
     '<div class="stat"><div class="n">Оценено</div><div class="v">'+ev.length+' / '+state.list.length+'</div></div>'+
     '<div class="stat"><div class="n">Средний балл</div><div class="v">'+fmt(avg(ev.map(d=>d.evaluation.total)))+'</div></div>'+
     Object.keys(byLang).sort().map(l=>'<div class="stat"><div class="n">'+esc(l)+'</div><div class="v">'+fmt(avg(byLang[l]))+'</div><div class="s">'+byLang[l].length+' диалогов</div></div>').join('')+
@@ -1887,6 +1923,32 @@ async function queueCard(){
     metrics+
     '<div class="tbl-wrap"><table class="t" style="min-width:640px"><thead><tr><th>№</th><th>Диалог</th><th>Риск</th><th>Итог ИИ</th><th>Почему в начале очереди</th>'+(m.n?'<th>Эталон</th>':'')+'</tr></thead><tbody>'+rows+'</tbody></table></div>'+
     '<div class="set-foot"><button class="btn primary" id="qOpenList">Открыть очередь в списке диалогов</button><span class="q-note" style="margin:0">Сортировка «Очередь проверки (по риску)»</span></div></div>';
+}
+/* ЖУРНАЛ ДЛЯ РЕГУЛЯТОРА: цепочка хэшей — оценки и решения нельзя незаметно изменить задним числом */
+const AUDIT_KIND={baseline:'точка отсчёта',checklist_saved:'сохранён чек-лист',evaluation_saved:'оценка ИИ',evaluation_updated:'решение супервизора',appeal_created:'апелляция подана',appeal_resolved:'апелляция рассмотрена'};
+function auditVerdict(v){
+  if(!v)return '';
+  if(v.ok)return '<div class="au-ok">✓ Целостность подтверждена: '+v.entries+' событий в цепочке, '+v.records_checked+' записей совпадают с зафиксированными отпечатками</div>';
+  let h='<div class="au-bad"><b>✗ Нарушена целостность</b>';
+  if(v.chain_broken_at)h+='<div>Цепочка журнала разорвана на событии №'+v.chain_broken_at.id+' ('+esc(v.chain_broken_at.ref)+') — запись журнала изменена</div>';
+  (v.tampered||[]).slice(0,5).forEach(t=>{h+='<div>Изменена в обход системы: <b>'+esc(t.ref)+'</b> (после события №'+t.logged_event+')</div>';});
+  if((v.unlogged||[]).length)h+='<div>Записей без отметки в журнале: '+v.unlogged.length+'</div>';
+  if((v.deleted||[]).length)h+='<div>Удалено записей: '+v.deleted.length+'</div>';
+  return h+'</div>';
+}
+async function auditCard(){
+  let ev,v;
+  try{[ev,v]=await Promise.all([api('/audit?limit=8'),api('/audit/verify')]);}catch(e){return '';}
+  const rows=ev.map(e=>{
+    const p=e.payload||{};
+    const what=e.kind.indexOf('evaluation')===0?esc(p.conversation_id||'')+(p.final_total!=null?' · итог '+fmt(p.final_total):'')+(p.decision&&p.decision.criterion_id?' · '+esc(p.decision.criterion_id)+': '+esc(p.decision.from)+' → '+esc(p.decision.to):'')
+      :e.kind.indexOf('appeal')===0?esc((p.conversation_id||'')+' '+(p.criterion_id||p.status||'')):esc(e.ref);
+    return '<tr><td class="num">'+e.id+'</td><td style="white-space:nowrap">'+fmtDate(e.ts)+'</td><td>'+esc(AUDIT_KIND[e.kind]||e.kind)+'</td><td style="font-size:12px">'+what+'</td>'+
+      '<td><code class="au-h" title="'+esc(e.hash)+'">'+esc(e.hash.slice(0,12))+'…</code></td></tr>';}).join('');
+  return '<div class="card au-card"><header><h2>Журнал для регулятора</h2><p>Freedom Holding регулирует SEC, поэтому важно доказать, что оценки и решения по апелляциям никто не изменил задним числом. Каждое событие хранит отпечаток записи (SHA-256) и сцеплено с предыдущим: правку в обход системы или подмену журнала видно сразу.</p></header>'+
+    '<div id="auVerdict" class="au-verdict">'+auditVerdict(v)+'</div>'+
+    '<div class="tbl-wrap"><table class="t" style="min-width:600px"><thead><tr><th>№</th><th>Время</th><th>Событие</th><th>Что</th><th>Хэш</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+    '<div class="set-foot"><button class="btn primary" id="auVerify">Проверить целостность</button><span class="q-note" style="margin:0">Голова цепочки: <code>'+esc((v.head_hash||'').slice(0,16))+'…</code></span></div></div>';
 }
 function resultsCard(){
   const ds=state.datasets||[];
@@ -2407,6 +2469,7 @@ function bind(){
   });
   /* сводка */
   $('#statsPane').addEventListener('click',e=>{
+    const av=e.target.closest('#auVerify');if(av){busy(av,true,'Проверяю…');api('/audit/verify').then(v=>{busy(av,false);$('#auVerdict').innerHTML=auditVerdict(v);toast(v.ok?'Целостность журнала подтверждена':'Обнаружено изменение данных в обход системы',v.ok?'ok':'err');}).catch(err=>{busy(av,false);toast(err.message,'err');});return;}
     const gq=e.target.closest('.go-q');if(gq){e.preventDefault();setView('dialogs');selectDialog(gq.dataset.id,true);return;}
     if(e.target.closest('#qOpenList')){state.filters.sort='attention';setView('dialogs');renderFilters();renderList();renderListActions();const f=filtered()[0];if(f)selectDialog(f.conversation_id,true);return;}
     const og=e.target.closest('[data-open-gross]');
@@ -2470,6 +2533,18 @@ function bind(){
   sb.addEventListener('click',e=>{
     const tg=e.target.closest('.tgl-detail');
     if(tg){const c=crit(tg);c._open=!c._open;renderSettings();return;}
+    const ct=e.target.closest('.crit-test');
+    if(ct){
+      const c=crit(ct);if(!c||state.ctBusy)return;
+      const body={};Object.keys(c).filter(k=>k[0]!=='_').forEach(k=>{body[k]=c[k];});
+      state.ctBusy=c.id;state.ctests=state.ctests||{};renderSettings();
+      api('/checklists/test-criterion',{method:'POST',body:{criterion:body}})
+        .then(r=>{r.sig=JSON.stringify([c.name,c.type,c.rule,c.na_allowed,c.na_condition,c.guidance,c.scale]);state.ctests[c.id]=r;
+          toast(r.passed===r.total?'Критерий «'+c.name+'»: все '+r.total+' тестов пройдены':'Критерий «'+c.name+'»: '+r.passed+' из '+r.total+' — посмотрите, где ИИ путается',r.passed===r.total?'ok':'warn',6000);})
+        .catch(err=>{state.ctests[c.id]={error:err.message};toast(err.message,'err');})
+        .finally(()=>{state.ctBusy=null;renderSettings();});
+      return;
+    }
     const del=e.target.closest('.del');if(!del)return;
     const c=crit(del);
     state.draft.criteria=state.draft.criteria.filter(x=>x!==c);
