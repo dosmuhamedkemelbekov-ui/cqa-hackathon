@@ -60,7 +60,9 @@ PRECEDENTS_PER_CRITERION = int(os.getenv("CQA_PRECEDENTS", "6"))
 # По умолчанию — тот же ключ и адрес, что у LLM.
 STT_MODEL = os.getenv("CQA_STT_MODEL", "whisper-1")
 STT_API_KEY = os.getenv("CQA_STT_API_KEY") or LLM_API_KEY
-STT_BASE_URL = os.getenv("CQA_STT_BASE_URL") or LLM_BASE_URL
+# Отдельный ключ распознавания (обычно OpenAI Whisper при модели Gemini/Groq) — по умолчанию идём в OpenAI,
+# а не на адрес основной модели: иначе ключ OpenAI ушёл бы в Gemini.
+STT_BASE_URL = os.getenv("CQA_STT_BASE_URL") or (None if os.getenv("CQA_STT_API_KEY") else LLM_BASE_URL)
 # ---- Режим оценки ----
 # per_criterion — отдельный вызов на каждый критерий (точнее, 8+ вызовов на диалог);
 # single — все критерии в одном вызове (1 вызов на диалог) — для бесплатных тарифов с дневным лимитом.
