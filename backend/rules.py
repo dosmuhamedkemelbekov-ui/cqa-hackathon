@@ -27,6 +27,7 @@ NAME = [
     re.compile(r"\b(?i:i'?m|i\s+am)\s+[A-Z]"),
 ]
 END_CLIENT = re.compile(r"(клиент покинул|покинул чат|соединение с клиентом прервано|связь прервал|байланыс үзілді|"
+                        r"чаттан шықты|чаттан шығып кетті|чатты тастап кетті|"
                         r"connection .*lost|customer left|left the chat)", re.I)
 END_OPERATOR = re.compile(r"(оператор закрыл чат|оператор чатты жапты|agent closed the chat|operator closed the chat)", re.I)
 
@@ -140,9 +141,14 @@ def apply(conv: dict, checklist: dict, prepared: dict, results: dict[str, dict])
             end = next((m for m in reversed(msgs) if m["speaker"] == "system" and END_CLIENT.search(m["text"])), None)
             if end:
                 before = [m for m in msgs if m["idx"] < end["idx"] and m["speaker"] in ("client", "operator")]
+                first_op = next((m for m in before if m["speaker"] == "operator"), None)
+                answered = first_op and any(m["speaker"] == "client" and m["idx"] > first_op["idx"] for m in before)
                 if before and before[-1]["speaker"] == "client":
                     set_answer(c, "na", "Чат оборвался сразу после реплики клиента — у оператора не было "
                                         "возможности завершить диалог.", end["id"])
+                elif first_op and not answered:
+                    set_answer(c, "na", "Клиент ушёл, так и не ответив оператору, — завершать было нечего: "
+                                        "чат оборвался до возможности его завершить.", end["id"])
             elif ops and not any(BYE.search(m["text"]) for m in ops):
                 set_answer(c, "no", "Оператор так и не попрощался, а чат не оборвался (нет события завершения).",
                            ops[-1]["id"])

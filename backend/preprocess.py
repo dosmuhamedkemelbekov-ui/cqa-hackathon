@@ -12,7 +12,7 @@ _REC_START = re.compile(r"(запись и транскрибирование (�
 _REC_PAUSE = re.compile(r"(запись и транскрибирование приостановлены|recording.*paused)", re.I)
 _ESCALATION = re.compile(r"(эскалац|операторға жіберілді|transferred to an agent|агент присоединился|переведен от агента)", re.I)
 _IDENTITY = re.compile(r"(личность клиента подтверждена|жеке басы расталды|identity verified)", re.I)
-_END = re.compile(r"(закрыл чат|чатты жапты|closed the chat|покинул чат|завершил разговор|прервано|байланыс үзілді|connection .*lost|left the chat)", re.I)
+_END = re.compile(r"(закрыл чат|чатты жапты|closed the chat|покинул чат|завершил разговор|прервано|байланыс үзілді|чаттан шықты|чаттан шығып кетті|connection .*lost|left the chat)", re.I)
 
 
 def _parse_iso(ts: str) -> datetime | None:
