@@ -2044,16 +2044,16 @@ async function fairnessCard(){
   let f;try{f=await api('/fairness'+(ds?'?dataset='+encodeURIComponent(ds):''));}catch(e){return '';}
   if(!f.languages||f.languages.length<2)return '';
   const pc=v=>v==null?'—':Math.round(v*100)+'%';
-  const head='<tr><th style="text-align:left">Критерий</th>'+f.languages.map(l=>'<th>'+esc(l)+(f.has_gold?' · ИИ / эталон':'')+'</th>').join('')+'<th>Перекос</th></tr>';
+  const head='<tr><th style="text-align:left">Критерий</th>'+f.languages.map(l=>'<th>'+esc(l)+(f.has_gold?' · ошибки ИИ':'')+'</th>').join('')+'<th>Вывод</th></tr>';
   const rows=f.criteria.map(c=>'<tr'+(c.flag?' class="fr-flag"':'')+'><td>'+esc(c.name)+'</td>'+f.languages.map(l=>{const x=c.cells[l]||{};
-      const b=x.bias;const cls=b==null?'':b>=0.15?'fr-strict':b<=-0.15?'fr-soft':'';
-      return '<td class="'+cls+'" title="ответов «не в пользу оператора»: ИИ '+pc(x.ai_rate)+(f.has_gold?', эталон '+pc(x.gold_rate):'')+' · n='+(x.n||0)+'">'+pc(x.ai_rate)+(f.has_gold?' / '+pc(x.gold_rate):'')+'<span class="fr-n">n='+(x.n||0)+'</span></td>';}).join('')+
-    '<td>'+(c.flag?'<span class="b warn">'+(c.bias_spread!=null?'ИИ строже эталона на одном языке (±'+Math.round(c.bias_spread*100)+' п.п.)':'разброс '+Math.round(c.spread*100)+' п.п.')+'</span>':'<span class="b ok">ровно</span>')+'</td></tr>').join('');
+      const v=f.has_gold?x.err_rate:x.ai_rate;
+      return '<td title="«не в пользу оператора»: ИИ '+pc(x.ai_rate)+(f.has_gold?', эталон '+pc(x.gold_rate)+' · ошибок ИИ '+pc(x.err_rate)+' из '+(x.err_n||0)+' диалогов':'')+'">'+pc(v)+'<span class="fr-n">'+(f.has_gold?'из '+(x.err_n||0):'n='+(x.n||0))+'</span></td>';}).join('')+
+    '<td>'+(c.flag?'<span class="b warn">'+(c.err_spread!=null?'на одном языке ошибается чаще (±'+Math.round(c.err_spread*100)+' п.п.)':'разброс '+Math.round(c.spread*100)+' п.п.')+'</span>':'<span class="b ok">одинаково'+(c.err_spread!=null?' (±'+Math.round(c.err_spread*100)+' п.п.)':'')+'</span>')+'</td></tr>').join('');
   const tot=f.languages.map(l=>{const t=f.totals[l]||{};return '<div class="stat"><div class="n">'+esc(l)+' · '+t.dialogs+' диал.</div><div class="v">'+fmt(t.avg_total)+'</div>'+(t.accuracy!=null?'<div class="s">совпадение с эталоном '+Math.round(t.accuracy*1000)/10+'%</div>':'')+'</div>';}).join('');
-  return '<div class="card fr-card"><header><h2>Справедливость между языками</h2><p>Не оценивает ли ИИ один язык строже другого. В ячейке — доля ответов «не в пользу оператора» («Нет», неполный балл, нарушение)'+(f.has_gold?' у ИИ и у эталона на том же языке: перекос — когда ИИ строже людей именно на одном языке':'')+'.</p></header>'+
-    '<div class="stat-grid">'+tot+'<div class="stat"><div class="n">Критериев с перекосом</div><div class="v">'+f.flags+'</div></div></div>'+
+  return '<div class="card fr-card"><header><h2>Справедливость между языками</h2><p>Не ошибается ли ИИ на одном языке чаще, чем на другом. '+(f.has_gold?'В ячейке — доля диалогов, где ответ ИИ разошёлся с эталоном (наведите — доли «не в пользу оператора» у ИИ и эталона). Перекос — разница больше 15 процентных пунктов':'В ячейке — доля ответов «не в пользу оператора»; эталона нет, поэтому вывод предварительный')+'.</p></header>'+
+    '<div class="stat-grid">'+tot+'<div class="stat"><div class="n">Критериев с перекосом</div><div class="v">'+f.flags+'</div>'+(f.flags?'':'<div class="s">ИИ одинаково точен на всех языках</div>')+'</div></div>'+
     '<div class="tbl-wrap"><table class="t" style="min-width:700px">'+head+rows+'</table></div>'+
-    '<p class="q-note">Красным — ИИ заметно строже эталона на этом языке, зелёным — мягче. На маленьких выборках (n&lt;5) выводы предварительные.</p></div>';
+    '<p class="q-note">Ошибки считаются по всем диалогам языка, а не только по применимым ответам: так малые выборки не дают ложных тревог.</p></div>';
 }
 function resultsCard(){
   const ds=state.datasets||[];

@@ -87,15 +87,28 @@ def fairness(latest: dict[str, dict], langs: dict[str, str], gold: dict | None =
                            "gold_n": g_n, "gold_rate": round(g_bad / g_n, 3) if g_n else None}
             if cells[lang]["ai_rate"] is not None and cells[lang]["gold_rate"] is not None:
                 cells[lang]["bias"] = round(cells[lang]["ai_rate"] - cells[lang]["gold_rate"], 3)
+        # Главная метрика справедливости — доля ОШИБОК ИИ относительно эталона на каждом языке (по всем диалогам,
+        # знаменатель — число диалогов, а не применимых ответов: устойчиво к малым выборкам).
+        for lang in languages:
+            err = tot = 0
+            for cid in by_lang[lang]:
+                g = ((gold or {}).get(cid) or {}).get("answers") or {}
+                if c["id"] in g:
+                    tot += 1
+                    err += latest[cid]["original_answers"].get(c["id"]) != g[c["id"]]
+            cells[lang]["err_n"] = tot
+            cells[lang]["err_rate"] = round(err / tot, 3) if tot else None
         rates = [v["ai_rate"] for v in cells.values() if v["ai_rate"] is not None and v["n"] >= min_n]
         spread = round(max(rates) - min(rates), 3) if len(rates) >= 2 else 0
+        errs = [v["err_rate"] for v in cells.values() if v.get("err_rate") is not None and v["err_n"] >= 10]
+        err_spread = round(max(errs) - min(errs), 3) if len(errs) >= 2 else None
         biases = [v.get("bias") for v in cells.values() if v.get("bias") is not None and v["n"] >= min_n]
         bias_spread = round(max(biases) - min(biases), 3) if len(biases) >= 2 else None
-        # Перекос считаем по смещению относительно эталона (если он есть): разная доля «Нет» по языкам
-        # сама по себе может быть честной — в разных наборах разные ошибки операторов.
-        flag = (bias_spread is not None and bias_spread >= 0.2) or (bias_spread is None and spread >= 0.3)
+        # Перекос = ИИ ошибается на одном языке заметно чаще, чем на другом (при эталоне);
+        # без эталона — только сильный разброс доли «не в пользу оператора».
+        flag = (err_spread is not None and err_spread >= 0.15) if gold else spread >= 0.3
         crit.append({"id": c["id"], "name": c["name"], "cells": cells, "spread": spread,
-                     "bias_spread": bias_spread, "flag": flag})
+                     "bias_spread": bias_spread, "err_spread": err_spread, "flag": flag})
     totals = {}
     for lang in languages:
         t = [latest[cid]["original_score"]["total"] for cid in by_lang[lang] if latest[cid]["original_score"]["total"] is not None]
