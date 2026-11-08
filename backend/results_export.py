@@ -60,13 +60,24 @@ def evidence_turns(item: dict, idx_by_id: dict[str, int]) -> list[int]:
     return sorted(turns)
 
 
-def model_info() -> dict:
+def _models_from(conversations: list[dict], latest: dict[str, dict]) -> list[str]:
+    """Модели, которые фактически оценивали диалоги набора (из сохранённых оценок), в порядке появления."""
+    out: list[str] = []
+    for c in conversations:
+        ev = latest.get(c["conversation_id"])
+        for m in str((ev or {}).get("model") or "").split(","):
+            m = m.strip()
+            if m and m not in out:
+                out.append(m)
+    return out
+
+
+def model_info(used: list[str] | None = None) -> dict:
     base = (config.LLM_BASE_URL or "").lower()
     local = any(h in base for h in ("localhost", "127.0.0.1", "0.0.0.0", "ollama"))
     mode = os.getenv("CQA_MODEL_MODE") or ("local" if local else "external_api")
-    name = os.getenv("CQA_MODEL_NAME") or config.LLM_MODEL
-    if not os.getenv("CQA_MODEL_NAME") and config.LLM_FALLBACK_MODEL and config.LLM_FALLBACK_MODEL != config.LLM_MODEL:
-        name += ", " + config.LLM_FALLBACK_MODEL  # по правилам: если моделей несколько — перечислить все
+    # По правилам: если моделей несколько — перечислить все. Берём фактически использованные.
+    name = os.getenv("CQA_MODEL_NAME") or (", ".join(used) if used else config.LLM_MODEL)
     return {"mode": mode, "name": name}
 
 
@@ -118,7 +129,7 @@ def build(conversations: list[dict], latest: dict[str, dict], team_name: str, us
     return {
         "schema_version": SCHEMA_VERSION,
         "team_name": team_name,
-        "model": model_info(),
+        "model": model_info(_models_from(conversations, latest)),
         "results": [conversation_result(c, latest.get(c["conversation_id"]), use, (failures or {}).get(c["conversation_id"]))
                     for c in conversations],
     }

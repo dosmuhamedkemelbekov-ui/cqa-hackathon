@@ -139,10 +139,9 @@ _exhausted: set[str] = set()
 
 def models_used() -> list[str]:
     """Какие модели реально оценивали: основная и, если включалась, резервная."""
-    out = [config.LLM_MODEL]
-    if config.LLM_FALLBACK_MODEL and _exhausted:
-        out.append(config.LLM_FALLBACK_MODEL)
-    return out
+    if config.LLM_FALLBACK_MODEL and config.LLM_MODEL in _exhausted:
+        return [config.LLM_FALLBACK_MODEL]  # основная модель уже недоступна — оценивает резервная
+    return [config.LLM_MODEL]
 
 
 async def _complete_openai(system: str, user: str, schema: dict, name: str, model: str | None = None,
