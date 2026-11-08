@@ -795,7 +795,7 @@ table.t tbody tr:hover{background:var(--g50)}
         <button class="btn" id="btnNormalize">Нормализовать до 100</button>
         <button class="btn" id="btnAdd">+ Добавить критерий</button>
         <button class="btn" id="btnResetDraft">Отменить правки</button>
-        <button class="btn" id="btnRegl">Вернуть регламент Freedom</button>
+        <button class="btn" id="btnRegl">Вернуть исходный регламент</button>
         <span class="spacer"></span>
         <button class="btn primary" id="btnApply">Применить и переоценить диалоги</button>
       </div>
@@ -2618,7 +2618,7 @@ function bind(){
   $('#btnResetDraft').addEventListener('click',()=>{newDraft();renderSettings();toast('Правки отменены','info',2500);});
   $('#btnRegl').addEventListener('click',async()=>{
     try{const def=await api('/checklists-default');const keepId=state.draft.id;newDraft(def);state.draft.id=keepId||def.id;renderSettings();
-      toast('Загружен регламент Freedom (в черновик). Нажмите «Применить», чтобы сохранить и переоценить.','info',4000);}
+      toast('Загружен исходный регламент (в черновик). Нажмите «Применить», чтобы сохранить и переоценить.','info',4000);}
     catch(e){toast(e.message,'err');}
   });
   $('#btnApply').addEventListener('click',applyConfig);
